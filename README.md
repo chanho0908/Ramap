@@ -71,6 +71,7 @@ Ramap/
 - Node.js 18 이상
 - pnpm 8 이상
 - Git
+- Supabase CLI (선택사항, 로컬 개발용)
 
 ### 설치
 
@@ -79,6 +80,9 @@ Ramap/
 git clone https://github.com/chanho0908/Ramap.git
 cd Ramap
 
+# 개발 브랜치로 전환
+git checkout develop
+
 # 의존성 설치
 pnpm install
 
@@ -86,6 +90,33 @@ pnpm install
 cp .env.example .env.local
 # .env.local 파일을 열어서 필요한 값 입력
 ```
+
+### Supabase 설정
+
+#### 옵션 1: Supabase Cloud 사용
+1. [Supabase](https://supabase.com/)에 가입
+2. 새 프로젝트 생성
+3. 프로젝트 설정에서 API URL과 anon key 복사
+4. `.env.local`에 값 입력
+
+#### 옵션 2: Supabase 로컬 개발 환경
+```bash
+# Supabase CLI 설치
+brew install supabase/tap/supabase  # macOS
+# 또는 다른 OS: https://supabase.com/docs/guides/cli
+
+# Supabase 로컬 시작
+supabase start
+
+# 마이그레이션 적용 (자동으로 적용됨)
+# 로컬 Supabase Studio: http://localhost:54323
+```
+
+### Kakao Map API 키 발급
+1. [Kakao Developers](https://developers.kakao.com/)에 가입
+2. 애플리케이션 추가
+3. 웹 플랫폼 등록 (http://localhost:3000)
+4. JavaScript 키를 `.env.local`의 `NEXT_PUBLIC_KAKAO_MAP_KEY`에 입력
 
 ### 개발 서버 실행
 
@@ -137,27 +168,59 @@ NEXT_PUBLIC_KAKAO_MAP_KEY=your-kakao-map-key
 4. Pull Request 생성
 5. 코드 리뷰 및 병합
 
+## 다음 단계
+
+프로젝트 초기 설정이 완료되었습니다! 다음과 같은 순서로 개발을 진행할 예정입니다:
+
+1. **지도 기능 구현** (Phase 2)
+   - Kakao Map SDK 통합
+   - 현재 위치 기반 지도 표시
+   - 라멘집 마커 표시
+
+2. **데이터 관리** (Phase 2)
+   - 라멘집 목록 API 구현
+   - 라멘집 상세 페이지
+   - Supabase와 연동
+
+3. **리뷰 시스템** (Phase 3)
+   - 리뷰 작성/조회 기능
+   - 사진 업로드
+   - 별점 시스템
+
+4. **체크인 기능** (Phase 3)
+   - 방문 기록 저장
+   - 방문 통계 표시
+
 ## 로드맵
 
-### Phase 1: MVP (v0.1.0) - 진행 중
-- [x] 프로젝트 셋업
-- [ ] 기본 UI/UX 설계
-- [ ] 지도 통합 (Kakao Map)
-- [ ] 라멘집 목록 및 상세
-- [ ] 리뷰 시스템
+### Phase 1: 프로젝트 초기화 ✅ 완료
+- [x] Git 저장소 설정 및 컨벤션 문서화
+- [x] Turborepo 모노레포 구조 설정
+- [x] Next.js 15 웹 앱 초기화
+- [x] Expo 모바일 앱 초기화
+- [x] 공유 패키지 구조 및 타입 정의
+- [x] Supabase 스키마 설계
+
+### Phase 2: 지도 & 검색 기능 - 다음 단계
+- [ ] Kakao Map API 통합
+- [ ] 위치 기반 검색 UI
+- [ ] 라멘집 목록 표시
+- [ ] 라멘집 상세 페이지
+- [ ] 웹/앱 간 지도 컴포넌트 조율
+
+### Phase 3: 리뷰 & 체크인 시스템
+- [ ] 리뷰 작성 폼
+- [ ] 사진 업로드 (Supabase Storage)
+- [ ] 리뷰 목록 및 정렬
 - [ ] 체크인 기능
+- [ ] 방문 통계 대시보드
 
-### Phase 2: 개선 (v0.2.0)
-- [ ] 검색 필터 고도화
-- [ ] 이미지 최적화
-- [ ] 성능 개선
+### Phase 4: 최적화 & 배포
+- [ ] 성능 최적화
+- [ ] SEO 최적화
 - [ ] PWA 지원
-
-### Phase 3: 확장 (v0.3.0)
-- [ ] 일본 지역 지원
-- [ ] 소셜 기능 (팔로우, 피드)
-- [ ] 추천 알고리즘
-- [ ] 다국어 지원
+- [ ] 앱 스토어 제출 준비
+- [ ] 배포 및 모니터링
 
 ## 라이선스
 
