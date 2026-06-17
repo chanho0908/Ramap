@@ -14,14 +14,21 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ramap.app"
+      "bundleIdentifier": "com.ramap.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ramap이 주변 라멘 가게를 찾기 위해 위치 정보가 필요합니다."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.ramap.app"
+      "package": "com.ramap.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -29,7 +36,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Ramap이 주변 라멘 가게를 찾기 위해 위치 정보가 필요합니다."
+        }
+      ]
     ],
     "scheme": "ramap",
     "experiments": {
