@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MapView } from '@/components/map/MapView';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { fetchNearbyShops } from '@ramap/shared';
@@ -16,6 +16,7 @@ const DEFAULT_LOCATION = { lat: 37.5665, lng: 126.978 };
 export default function MapPage() {
   const { location, error: geoError, loading: geoLoading } = useGeolocation();
   const [shops, setShops] = useState<Shop[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isLoadingShops, setIsLoadingShops] = useState(false);
   const [shopsError, setShopsError] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<typeof DEFAULT_LOCATION>(DEFAULT_LOCATION);
@@ -57,6 +58,29 @@ export default function MapPage() {
     loadShops();
   }, [center.lat, center.lng]);
 
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredShops = useMemo(() => {
+    if (!normalizedSearchQuery) {
+      return shops;
+    }
+
+    return shops.filter((shop) => {
+      const searchableText = [
+        shop.name,
+        shop.address,
+        shop.phone,
+        shop.businessHours,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearchQuery);
+    });
+  }, [shops, normalizedSearchQuery]);
+
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
   // 지도 이동 핸들러
   const handleMapMove = (newCenter: typeof DEFAULT_LOCATION) => {
     console.log('[Map Page] User dragged map to:', newCenter);
@@ -76,7 +100,9 @@ export default function MapPage() {
                 위치 확인 중...
               </span>
             ) : (
-              `주변 라멘 가게 ${shops.length}곳`
+              hasSearchQuery
+                ? `검색 결과 ${filteredShops.length}곳 / 주변 ${shops.length}곳`
+                : `주변 라멘 가게 ${shops.length}곳`
             )}
           </p>
         </div>
@@ -87,11 +113,40 @@ export default function MapPage() {
         )}
       </header>
 
+      <section className="bg-white border-b border-gray-200 px-4 py-3">
+        <label htmlFor="shop-search" className="sr-only">
+          라멘 가게 검색
+        </label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+            검색
+          </span>
+          <input
+            id="shop-search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            type="search"
+            placeholder="가게명, 주소, 전화번호"
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-12 pr-10 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+              aria-label="검색어 지우기"
+            >
+              지우기
+            </button>
+          )}
+        </div>
+      </section>
+
       {/* 지도 */}
       <main className="flex-1 relative">
         <MapView
           center={center}
-          shops={shops}
+          shops={filteredShops}
           zoom={3}
           onMapMove={handleMapMove}
         />
@@ -118,14 +173,16 @@ export default function MapPage() {
         )}
 
         {/* 가게 없음 메시지 */}
-        {!isLoadingShops && !shopsError && shops.length === 0 && (
+        {!isLoadingShops && !shopsError && filteredShops.length === 0 && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 max-w-sm text-center">
             <div className="text-4xl mb-3">🍜</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              주변에 가게가 없습니다
+              {hasSearchQuery ? '검색 결과가 없습니다' : '주변에 가게가 없습니다'}
             </h3>
             <p className="text-sm text-gray-600">
-              다른 지역을 검색하거나 지도를 이동해보세요.
+              {hasSearchQuery
+                ? '검색어를 바꾸거나 지우면 주변 가게를 다시 볼 수 있습니다.'
+                : '다른 지역을 검색하거나 지도를 이동해보세요.'}
             </p>
           </div>
         )}
