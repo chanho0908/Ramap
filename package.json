@@ -21,7 +21,16 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "crawl:shops": "tsx scripts/crawling/crawl-shops.ts",
     "crawl:shops:strict": "tsx scripts/crawling/crawl-shops.ts --strict",
-    "crawl:shops:dry-run": "tsx scripts/crawling/crawl-shops.ts --dry-run"
+    "crawl:shops:dry-run": "tsx scripts/crawling/crawl-shops.ts --dry-run",
+    "update:descriptions": "tsx scripts/crawling/update-missing-descriptions.ts",
+    "update:descriptions:dry-run": "tsx scripts/crawling/update-missing-descriptions.ts --dry-run",
+    "clean:kakaomap-prefix": "tsx scripts/crawling/clean-kakaomap-prefix.ts",
+    "clean:kakaomap-prefix:dry-run": "tsx scripts/crawling/clean-kakaomap-prefix.ts --dry-run",
+    "delete:non-ramen": "tsx scripts/crawling/delete-non-ramen-shops.ts",
+    "delete:non-ramen:dry-run": "tsx scripts/crawling/delete-non-ramen-shops.ts --dry-run",
+    "analyze:non-ramen": "tsx scripts/crawling/analyze-non-ramen-shops.ts",
+    "analyze:non-ramen:delete": "tsx scripts/crawling/analyze-non-ramen-shops.ts --delete --dry-run",
+    "analyze:non-ramen:delete:confirm": "tsx scripts/crawling/analyze-non-ramen-shops.ts --delete --confirm"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -35,8 +44,11 @@
     "pnpm": ">=8.0.0"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.18.0",
+    "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
+    "puppeteer": "^25.1.0",
     "tsx": "^4.22.4"
   }
 }

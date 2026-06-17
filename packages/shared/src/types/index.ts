@@ -6,12 +6,15 @@ export interface Location {
 
 export interface Shop {
   id: string;
+  kakaoPlaceId?: string;
   name: string;
   address: string;
   location: Location;
-  description?: string;
+  kakaoPlaceUrl?: string;
   phone?: string;
   businessHours?: string;
+  instagramUrl?: string;
+  kakaoRating?: number;
   createdAt: string;
   updatedAt: string;
 }
