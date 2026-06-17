@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { router } from 'expo-router';
 
 export default function Index() {
   return (
@@ -7,8 +8,11 @@ export default function Index() {
       <Text style={styles.title}>Ramap</Text>
       <Text style={styles.subtitle}>라멘 오타쿠를 위한 전국 라멘 지도</Text>
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.primaryButton}>
-          <Text style={styles.buttonText}>시작하기</Text>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => router.push('/map')}
+        >
+          <Text style={styles.buttonText}>지도 보기</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryButton}>
           <Text style={styles.buttonText}>더 알아보기</Text>
