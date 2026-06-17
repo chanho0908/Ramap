@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
@@ -7,10 +9,13 @@ export default function Home() {
           라멘 오타쿠를 위한 전국 라멘 지도
         </p>
         <div className="flex gap-4 justify-center">
-          <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-            시작하기
-          </button>
-          <button className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+          <Link
+            href="/map"
+            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors"
+          >
+            지도 보기
+          </Link>
+          <button className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-colors">
             더 알아보기
           </button>
         </div>
