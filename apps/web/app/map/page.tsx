@@ -18,17 +18,29 @@ export default function MapPage() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [isLoadingShops, setIsLoadingShops] = useState(false);
   const [shopsError, setShopsError] = useState<string | null>(null);
+  const [mapCenter, setMapCenter] = useState<typeof DEFAULT_LOCATION>(DEFAULT_LOCATION);
 
-  // 중심 위치: 현재 위치 또는 기본 위치
-  const center = location || DEFAULT_LOCATION;
+  // 중심 위치: 지도 중심 (드래그 가능) 또는 GPS 위치 또는 기본 위치
+  const center = mapCenter;
 
-  // 가게 데이터 가져오기
+  // GPS 위치 변경 시 지도 중심 업데이트 (초기 한 번만)
+  useEffect(() => {
+    if (location) {
+      console.log('[Map Page] GPS location detected:', location);
+      setMapCenter(location);
+    }
+  }, [location]);
+
+  // 가게 데이터 가져오기 (지도 중심 변경 시마다 실행)
   useEffect(() => {
     const loadShops = async () => {
       try {
         setIsLoadingShops(true);
         setShopsError(null);
+        console.log('[Map Page] Fetching shops near:', center);
         const data = await fetchNearbyShops(center, 5); // 5km 반경
+        console.log('[Map Page] Fetched shops:', data.length, 'shops');
+        console.log('[Map Page] Shop details:', data.map(s => ({ id: s.id, name: s.name, lat: s.location.lat, lng: s.location.lng })));
         setShops(data);
       } catch (err) {
         console.error('[Map Page] Failed to load shops:', err);
@@ -44,6 +56,12 @@ export default function MapPage() {
 
     loadShops();
   }, [center.lat, center.lng]);
+
+  // 지도 이동 핸들러
+  const handleMapMove = (newCenter: typeof DEFAULT_LOCATION) => {
+    console.log('[Map Page] User dragged map to:', newCenter);
+    setMapCenter(newCenter);
+  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -71,7 +89,12 @@ export default function MapPage() {
 
       {/* 지도 */}
       <main className="flex-1 relative">
-        <MapView center={center} shops={shops} zoom={3} />
+        <MapView
+          center={center}
+          shops={shops}
+          zoom={3}
+          onMapMove={handleMapMove}
+        />
 
         {/* 가게 로딩 오버레이 */}
         {isLoadingShops && (

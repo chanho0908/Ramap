@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import MapView, { Marker, Callout, PROVIDER_DEFAULT } from 'react-native-maps';
 import type { Shop, Location } from '@ramap/shared';
+import { CustomMarkerIcon } from './CustomMarker';
 
 interface ShopMapViewProps {
   center: Location;
@@ -31,6 +32,7 @@ export function ShopMapView({
   onMarkerPress,
 }: ShopMapViewProps) {
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedShopId, setSelectedShopId] = useState<string | null>(null);
 
   return (
     <View style={styles.container}>
@@ -49,30 +51,68 @@ export function ShopMapView({
         showsMyLocationButton
       >
         {/* 가게 마커 */}
-        {shops.map((shop) => (
+        {shops.map((shop, index) => (
           <Marker
             key={shop.id}
             coordinate={{
               latitude: shop.location.lat,
               longitude: shop.location.lng,
             }}
-            title={shop.name}
-            description={shop.address}
-            onPress={() => onMarkerPress?.(shop)}
+            onPress={() => {
+              setSelectedShopId(shop.id);
+              onMarkerPress?.(shop);
+            }}
+            tracksViewChanges={false}
           >
-            {/* 커스텀 Callout (정보창) */}
-            <Callout>
+            {/* 커스텀 마커 아이콘 */}
+            <CustomMarkerIcon
+              shop={shop}
+              isSelected={selectedShopId === shop.id}
+              animationDelay={index * 50}
+            />
+
+            {/* 개선된 Callout (정보창) */}
+            <Callout onPress={() => onMarkerPress?.(shop)}>
               <View style={styles.callout}>
-                <Text style={styles.calloutTitle}>{shop.name}</Text>
-                <Text style={styles.calloutText}>{shop.address}</Text>
+                {/* 헤더 */}
+                <View style={styles.calloutHeader}>
+                  <Text style={styles.calloutTitle}>🍜 {shop.name}</Text>
+                  {shop.kakaoRating && shop.kakaoRating > 0 && (
+                    <View style={styles.calloutRating}>
+                      <Text style={styles.calloutRatingText}>
+                        ⭐ {shop.kakaoRating.toFixed(1)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* 주소 */}
+                <Text style={styles.calloutText}>📍 {shop.address}</Text>
+
+                {/* 전화번호 */}
                 {shop.phone && (
-                  <Text style={styles.calloutText}>전화: {shop.phone}</Text>
+                  <Text style={styles.calloutText}>📞 {shop.phone}</Text>
                 )}
+
+                {/* 영업시간 */}
+                {shop.businessHours && (
+                  <Text style={styles.calloutText}>🕒 {shop.businessHours}</Text>
+                )}
+
+                {/* 설명 */}
                 {shop.description && (
-                  <Text style={styles.calloutDescription} numberOfLines={2}>
+                  <Text style={styles.calloutDescription} numberOfLines={3}>
                     {shop.description}
                   </Text>
                 )}
+
+                {/* 인스타그램 */}
+                {shop.instagramUrl && (
+                  <Text style={styles.calloutInstagram}>📷 Instagram</Text>
+                )}
+
+                {/* 상세보기 힌트 */}
+                <Text style={styles.calloutHint}>탭하여 상세보기</Text>
               </View>
             </Callout>
           </Marker>
@@ -122,28 +162,61 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   callout: {
-    padding: 8,
-    minWidth: 200,
-    maxWidth: 300,
+    padding: 12,
+    minWidth: 220,
+    maxWidth: 320,
+  },
+  calloutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   calloutTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
+  },
+  calloutRating: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  calloutRatingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400E',
   },
   calloutText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#4b5563',
-    marginBottom: 2,
+    marginBottom: 4,
+    lineHeight: 18,
   },
   calloutDescription: {
     fontSize: 13,
     color: '#6b7280',
-    marginTop: 4,
-    paddingTop: 4,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+    lineHeight: 18,
+  },
+  calloutInstagram: {
+    fontSize: 12,
+    color: '#8b5cf6',
+    marginTop: 6,
+    fontWeight: '500',
+  },
+  calloutHint: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginTop: 8,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   shopCount: {
     position: 'absolute',

@@ -12,6 +12,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@ramap/shared": "workspace:*",
     "expo": "~52.0.0",
     "expo-location": "~18.0.0",
     "expo-router": "~4.0.0",

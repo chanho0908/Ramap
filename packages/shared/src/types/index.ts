@@ -46,3 +46,23 @@ export interface User {
   profileImage?: string;
   createdAt: string;
 }
+
+// Map marker types
+export type MarkerState = 'default' | 'hover' | 'selected';
+
+export interface MarkerConfig {
+  size: {
+    width: number;
+    height: number;
+  };
+  colors: {
+    default: string;
+    hover: string;
+    selected: string;
+  };
+  zIndex: {
+    default: number;
+    hover: number;
+    selected: number;
+  };
+}
