@@ -70,29 +70,33 @@ EOF
 ## PR 템플릿
 
 ```markdown
-## 변경 사항
-- [ ] 주요 변경사항 1
-- [ ] 주요 변경사항 2
+## Summary
+간결한 변경사항 요약 (2-3문장)
 
-## 테스트
+## 주요 변경사항
+- 변경사항 1
+- 변경사항 2
+- 변경사항 3
+
+## Test Plan
 - [ ] 로컬 테스트 완료
 - [ ] 타입 에러 없음
-- [ ] 주요 시나리오 확인
+- [ ] 주요 시나리오 검증
 
 ## 스크린샷 (UI 변경 시)
 [웹/모바일 스크린샷]
 
-## 체크리스트
-- [ ] 코딩 컨벤션 준수
-- [ ] 테스트 작성 완료
-- [ ] console.log 제거
-- [ ] 타입 에러 없음
-
-## 관련 이슈
+## Related Issues
 Closes #<issue-number>
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
+
+**주의사항**:
+- ❌ **Notes 섹션 추가 금지** (PR 크기, 의존성, 다음 단계 등)
+- ✅ Summary는 간결하게 (2-3문장)
+- ✅ Test Plan으로 통일
+- ✅ 체크리스트 중복 제거
 
 ## Draft PR 규칙
 - **초기 생성**: 항상 Draft로 시작
