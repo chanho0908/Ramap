@@ -1,80 +1,53 @@
 /**
- * Supabase DB Importer
+ * Supabase Database Importer
  *
- * 검증된 Shop 데이터를 Supabase에 저장합니다.
+ * 검증된 Shop 데이터를 Supabase에 배치로 저장합니다.
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { ValidatedShop } from './data-validator';
-import * as dotenv from 'dotenv';
+import type { ValidatedShop } from './data-validator';
 
-// Load environment variables
-dotenv.config();
-
-interface ImportOptions {
-  upsert?: boolean; // true: 충돌 시 업데이트, false: 충돌 시 스킵
-  batchSize?: number; // 한 번에 insert할 개수 (기본: 50)
-  dryRun?: boolean; // true: 실제 DB 저장 안 함 (테스트용)
-}
-
-interface ImportResult {
+export interface ImportResult {
   success: number;
   failed: number;
-  errors: ImportError[];
+  errors: Array<{
+    shop: ValidatedShop;
+    error: string;
+  }>;
 }
 
-interface ImportError {
-  shopId: string;
-  shopName: string;
-  reason: string;
+export interface ImportOptions {
+  batchSize?: number; // 한 번에 삽입할 데이터 개수 (기본값: 50)
+  upsert?: boolean; // 중복 시 업데이트 여부 (기본값: false)
 }
 
+/**
+ * Supabase에 Shop 데이터 배치 삽입
+ */
 export class SupabaseImporter {
-  private client: SupabaseClient;
+  private supabase: SupabaseClient;
 
-  constructor(supabaseUrl?: string, supabaseKey?: string) {
-    const url =
-      supabaseUrl ||
-      process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      process.env.SUPABASE_URL;
-
-    const key =
-      supabaseKey ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      process.env.SUPABASE_ANON_KEY;
-
-    if (!url || !key) {
-      throw new Error(
-        'Supabase URL과 Anon Key가 필요합니다. .env 파일을 확인하세요.'
-      );
+  constructor(supabaseUrl: string, supabaseKey: string) {
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL and Key are required');
     }
 
-    this.client = createClient(url, key);
-    console.log('✅ Supabase 클라이언트 초기화 완료\n');
+    this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
   /**
-   * Shop 데이터를 Supabase에 import
+   * Shop 데이터 배치 삽입
    *
-   * @param shops 검증된 Shop 배열
-   * @param options Import 옵션
-   * @returns Import 결과
+   * @param shops 저장할 Shop 데이터 배열
+   * @param options 삽입 옵션
+   * @returns 삽입 결과
    */
   async importShops(
     shops: ValidatedShop[],
     options: ImportOptions = {}
   ): Promise<ImportResult> {
-    const {
-      upsert = true,
-      batchSize = 50,
-      dryRun = false,
-    } = options;
-
-    if (dryRun) {
-      console.log('🔍 [DRY RUN 모드] 실제 DB 저장 없이 시뮬레이션만 수행합니다\n');
-    }
-
-    console.log(`\n📦 Import 시작: ${shops.length}개 (배치 크기: ${batchSize})\n`);
+    const batchSize = options.batchSize || 50;
+    const upsert = options.upsert || false;
 
     const result: ImportResult = {
       success: 0,
@@ -82,165 +55,230 @@ export class SupabaseImporter {
       errors: [],
     };
 
-    // 배치 단위로 처리
-    for (let i = 0; i < shops.length; i += batchSize) {
-      const batch = shops.slice(i, i + batchSize);
-      const batchNumber = Math.floor(i / batchSize) + 1;
-      const totalBatches = Math.ceil(shops.length / batchSize);
+    console.log(`\n📤 Supabase에 ${shops.length}개 Shop 저장 시작...`);
+    console.log(`   배치 크기: ${batchSize}개`);
+    console.log(`   Upsert 모드: ${upsert ? '활성화' : '비활성화'}\n`);
+
+    // 배치로 나누어 처리
+    const batches = this.createBatches(shops, batchSize);
+
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const batchNumber = i + 1;
 
       console.log(
-        `📦 배치 ${batchNumber}/${totalBatches} 처리 중 (${batch.length}개)...`
+        `  배치 ${batchNumber}/${batches.length}: ${batch.length}개 처리 중...`
       );
 
-      if (dryRun) {
-        // Dry run: 실제 저장하지 않고 로그만 출력
-        result.success += batch.length;
-        console.log(`  ✅ [DRY RUN] ${batch.length}개 시뮬레이션 완료`);
-        continue;
-      }
-
-      // 실제 DB 저장
       try {
-        const dbRecords = batch.map(shop => this.toDbRecord(shop));
+        const batchResult = await this.insertBatch(batch, upsert);
+        result.success += batchResult.success;
+        result.failed += batchResult.failed;
+        result.errors.push(...batchResult.errors);
 
-        if (upsert) {
-          // Upsert: 충돌 시 업데이트
-          const { error } = await this.client
-            .from('shops')
-            .upsert(dbRecords, {
-              onConflict: 'kakao_place_id', // Kakao Place ID로 중복 감지
-            });
-
-          if (error) {
-            throw error;
-          }
-        } else {
-          // Insert: 충돌 시 에러
-          const { error } = await this.client
-            .from('shops')
-            .insert(dbRecords);
-
-          if (error) {
-            throw error;
-          }
-        }
-
-        result.success += batch.length;
-        console.log(`  ✅ ${batch.length}개 저장 완료`);
-      } catch (error: any) {
+        console.log(
+          `    ✅ 성공: ${batchResult.success}개, ❌ 실패: ${batchResult.failed}개`
+        );
+      } catch (error) {
+        console.error(`    ❌ 배치 ${batchNumber} 처리 중 오류:`, error);
         result.failed += batch.length;
-
-        // 배치 전체 실패 시 개별 처리 시도
-        console.log(`  ⚠️  배치 실패, 개별 처리 시도...`);
-
-        for (const shop of batch) {
-          try {
-            const dbRecord = this.toDbRecord(shop);
-
-            if (upsert) {
-              const { error } = await this.client
-                .from('shops')
-                .upsert([dbRecord], { onConflict: 'kakao_place_id' });
-
-              if (error) throw error;
-            } else {
-              const { error } = await this.client
-                .from('shops')
-                .insert([dbRecord]);
-
-              if (error) throw error;
-            }
-
-            result.success++;
-            result.failed--;
-            console.log(`    ✅ ${shop.name} 저장 완료`);
-          } catch (individualError: any) {
-            result.errors.push({
-              shopId: shop.id,
-              shopName: shop.name,
-              reason: individualError.message || String(individualError),
-            });
-            console.log(`    ❌ ${shop.name} 실패: ${individualError.message}`);
-          }
-        }
+        batch.forEach(shop => {
+          result.errors.push({
+            shop,
+            error:
+              error instanceof Error ? error.message : '알 수 없는 오류',
+          });
+        });
       }
     }
 
-    console.log(`\n📊 Import 결과:`);
-    console.log(`  ✅ 성공: ${result.success}개`);
-    console.log(`  ❌ 실패: ${result.failed}개`);
+    console.log(`\n✅ 저장 완료:`);
+    console.log(`   - 성공: ${result.success}개`);
+    console.log(`   - 실패: ${result.failed}개`);
 
     if (result.errors.length > 0) {
-      console.log(`\n❌ 실패 항목 상세:`);
-      result.errors.forEach((err) => {
-        console.log(`  - ${err.shopName} (${err.shopId}): ${err.reason}`);
+      console.log(`\n⚠️  오류 상세:`);
+      result.errors.slice(0, 5).forEach((err, idx) => {
+        console.log(`   ${idx + 1}. ${err.shop.name}: ${err.error}`);
       });
+      if (result.errors.length > 5) {
+        console.log(`   ... 그 외 ${result.errors.length - 5}개 오류`);
+      }
     }
 
     return result;
   }
 
   /**
-   * ValidatedShop을 DB 레코드로 변환
-   *
-   * @param shop ValidatedShop 객체
-   * @returns DB 레코드 (snake_case)
+   * 단일 배치 삽입
    */
-  private toDbRecord(shop: ValidatedShop): any {
-    return {
-      // id는 DB 기본값(uuid)으로 생성하고, upsert 업데이트 시 기존 id를 유지합니다.
-      kakao_place_id: shop.id, // Kakao Place ID는 별도 컬럼에 저장
-      name: shop.name,
-      address: shop.address,
-      lat: shop.lat,
-      lng: shop.lng,
-      kakao_place_url: shop.kakaoPlaceUrl || null,
-      phone: shop.phone || null,
-      business_hours: shop.businessHours || null,
-      instagram_url: shop.instagramUrl || null,
-      kakao_rating: shop.kakaoRating || null,
-      // created_at, updated_at은 DB에서 자동 설정됨
+  private async insertBatch(
+    batch: ValidatedShop[],
+    upsert: boolean
+  ): Promise<ImportResult> {
+    const result: ImportResult = {
+      success: 0,
+      failed: 0,
+      errors: [],
     };
+
+    try {
+      const { data, error } = upsert
+        ? await this.supabase
+            .from('shops')
+            .upsert(batch, {
+              onConflict: 'name,address', // 이름과 주소가 같으면 업데이트
+            })
+            .select()
+        : await this.supabase.from('shops').insert(batch).select();
+
+      if (error) {
+        throw error;
+      }
+
+      result.success = data?.length || batch.length;
+    } catch (error) {
+      // Supabase 오류 처리
+      if (this.isSupabaseError(error)) {
+        // 개별 항목 오류인 경우 재시도
+        if (error.code === '23505') {
+          // Unique constraint violation
+          console.log(
+            '    ⚠️  중복 키 감지, 개별 삽입으로 재시도 중...'
+          );
+          return await this.insertIndividually(batch);
+        }
+
+        // 기타 Supabase 오류
+        batch.forEach(shop => {
+          result.errors.push({
+            shop,
+            error: `${error.code}: ${error.message}`,
+          });
+        });
+        result.failed = batch.length;
+      } else {
+        // 일반 오류
+        batch.forEach(shop => {
+          result.errors.push({
+            shop,
+            error: error instanceof Error ? error.message : '알 수 없는 오류',
+          });
+        });
+        result.failed = batch.length;
+      }
+    }
+
+    return result;
   }
 
   /**
-   * 특정 Shop이 이미 DB에 존재하는지 확인
-   *
-   * @param shopId Kakao Place ID
-   * @returns 존재 여부
+   * 개별 삽입 (중복 오류 시 사용)
    */
-  async shopExists(shopId: string): Promise<boolean> {
-    const { data, error } = await this.client
-      .from('shops')
-      .select('id')
-      .eq('kakao_place_id', shopId)
-      .single();
+  private async insertIndividually(
+    shops: ValidatedShop[]
+  ): Promise<ImportResult> {
+    const result: ImportResult = {
+      success: 0,
+      failed: 0,
+      errors: [],
+    };
 
-    return !error && !!data;
+    for (const shop of shops) {
+      try {
+        const { error } = await this.supabase
+          .from('shops')
+          .insert(shop)
+          .select();
+
+        if (error) {
+          if (error.code === '23505') {
+            // 중복은 조용히 건너뛰기
+            continue;
+          }
+          throw error;
+        }
+
+        result.success++;
+      } catch (error) {
+        result.failed++;
+        result.errors.push({
+          shop,
+          error:
+            error instanceof Error ? error.message : '알 수 없는 오류',
+        });
+      }
+    }
+
+    return result;
   }
 
   /**
-   * DB 연결 테스트
-   *
-   * @returns 연결 성공 여부
+   * 배열을 배치로 나누기
+   */
+  private createBatches<T>(items: T[], batchSize: number): T[][] {
+    const batches: T[][] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+      batches.push(items.slice(i, i + batchSize));
+    }
+    return batches;
+  }
+
+  /**
+   * Supabase 오류인지 확인
+   */
+  private isSupabaseError(error: any): error is {
+    code: string;
+    message: string;
+    details: string;
+  } {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      'message' in error
+    );
+  }
+
+  /**
+   * 데이터베이스 연결 테스트
    */
   async testConnection(): Promise<boolean> {
     try {
-      const { error } = await this.client
+      const { data, error } = await this.supabase
         .from('shops')
-        .select('id')
-        .limit(1);
+        .select('count', { count: 'exact', head: true });
 
       if (error) {
-        console.error('❌ DB 연결 실패:', error.message);
+        console.error('❌ Supabase 연결 실패:', error.message);
         return false;
       }
 
-      console.log('✅ DB 연결 성공\n');
+      console.log('✅ Supabase 연결 성공');
       return true;
     } catch (error) {
-      console.error('❌ DB 연결 실패:', error);
+      console.error('❌ Supabase 연결 오류:', error);
       return false;
+    }
+  }
+
+  /**
+   * 현재 Shop 개수 조회
+   */
+  async getShopCount(): Promise<number> {
+    try {
+      const { count, error } = await this.supabase
+        .from('shops')
+        .select('*', { count: 'exact', head: true });
+
+      if (error) {
+        throw error;
+      }
+
+      return count || 0;
+    } catch (error) {
+      console.error('Shop 개수 조회 실패:', error);
+      return 0;
     }
   }
 }

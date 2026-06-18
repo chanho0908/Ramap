@@ -1,275 +1,212 @@
 /**
  * 데이터 검증 및 변환 로직
  *
- * Kakao API 응답을 Ramap Shop 형식으로 변환하고 검증합니다.
+ * Kakao Places API 응답을 Supabase Shop 스키마로 변환하고 검증합니다.
  */
 
-import { KakaoPlace } from './kakao-api';
-import { PlaceDetail, SocialLinks } from './kakao-detail-scraper';
+import type { KakaoPlace } from './kakao-api';
 
 export interface ValidatedShop {
-  id: string; // Kakao Place ID
   name: string;
   address: string;
   lat: number;
   lng: number;
-  kakaoPlaceUrl?: string;
-  description?: string;
   phone?: string;
-  businessHours?: string;
-  instagramUrl?: string;
-  kakaoRating?: number;
+  description?: string;
+  business_hours?: string;
 }
 
 export interface ValidationResult {
   valid: ValidatedShop[];
-  invalid: ValidationError[];
+  invalid: Array<{
+    place: KakaoPlace;
+    reason: string;
+  }>;
+  duplicates: number;
 }
 
-export interface ValidationError {
-  placeId: string;
-  placeName: string;
-  reason: string;
-  originalData: KakaoPlace;
+// 한국 영역 좌표 범위
+const KOREA_BOUNDS = {
+  minLat: 33.0,
+  maxLat: 43.0,
+  minLng: 124.0,
+  maxLng: 132.0,
+} as const;
+
+/**
+ * 좌표가 한국 영역 내에 있는지 검증
+ */
+function isValidKoreaCoordinates(lat: number, lng: number): boolean {
+  return (
+    lat >= KOREA_BOUNDS.minLat &&
+    lat <= KOREA_BOUNDS.maxLat &&
+    lng >= KOREA_BOUNDS.minLng &&
+    lng <= KOREA_BOUNDS.maxLng
+  );
 }
 
-export class DataValidator {
-  /**
-   * KakaoPlace 배열을 ValidatedShop으로 변환 및 검증
-   *
-   * @param places Kakao API에서 가져온 장소 목록
-   * @param placeDetails 스크래핑한 상세 정보 (선택)
-   * @returns 검증 결과
-   */
-  validateAndTransform(
-    places: KakaoPlace[],
-    placeDetails?: Map<string, PlaceDetail>
-  ): ValidationResult {
-    const valid: ValidatedShop[] = [];
-    const invalid: ValidationError[] = [];
+/**
+ * 라멘집 관련 키워드를 포함하는지 검증
+ * 카테고리나 이름에서 라멘 관련 키워드 체크
+ */
+function isRamenRelated(place: KakaoPlace): boolean {
+  const ramenKeywords = [
+    '라멘',
+    '라면',
+    'ラーメン',
+    'ramen',
+    '라멘야',
+    '라멘집',
+    '라멘가게',
+  ];
 
-    console.log(`\n🔍 데이터 검증 시작: ${places.length}개 장소\n`);
+  const searchText =
+    `${place.place_name} ${place.category_name}`.toLowerCase();
 
-    for (const place of places) {
-      try {
-        // 필수 필드 검증
-        this.validateRequiredFields(place);
+  return ramenKeywords.some(keyword =>
+    searchText.includes(keyword.toLowerCase())
+  );
+}
 
-        // 좌표 검증
-        this.validateCoordinates(place.x, place.y);
+/**
+ * 중복 생성을 위한 유니크 키 생성 (이름 + 주소 해시)
+ */
+function generateShopKey(name: string, address: string): string {
+  return `${name.trim().toLowerCase()}|${address.trim().toLowerCase()}`;
+}
 
-        // 전화번호 검증 (선택)
-        if (place.phone) {
-          this.validatePhone(place.phone);
-        }
+/**
+ * Kakao Place를 ValidatedShop으로 변환
+ */
+function transformKakaoPlaceToShop(place: KakaoPlace): ValidatedShop {
+  const lat = parseFloat(place.y);
+  const lng = parseFloat(place.x);
 
-        // Instagram URL 검증 (선택)
-        let instagramUrl: string | undefined;
-        let kakaoRating: number | undefined;
+  // description: Kakao Map 링크 포함
+  const description = place.place_url
+    ? `카카오맵: ${place.place_url}`
+    : undefined;
 
-        if (placeDetails) {
-          const detail = placeDetails.get(place.id);
+  return {
+    name: place.place_name,
+    address: place.road_address_name || place.address_name,
+    lat,
+    lng,
+    phone: place.phone || undefined,
+    description,
+    business_hours: undefined, // Kakao API에서 제공하지 않음
+  };
+}
 
-          if (detail?.socialLinks.instagram) {
-            instagramUrl = this.validateInstagramUrl(
-              detail.socialLinks.instagram
-            );
-          }
+/**
+ * Kakao Places 배열을 검증하고 변환
+ *
+ * @param places Kakao API에서 받은 장소 목록
+ * @param strictMode true일 경우 라멘 관련 키워드 필터링 적용 (기본값: false)
+ * @returns 검증 결과
+ */
+export function validateAndTransformPlaces(
+  places: KakaoPlace[],
+  strictMode: boolean = false
+): ValidationResult {
+  const valid: ValidatedShop[] = [];
+  const invalid: Array<{ place: KakaoPlace; reason: string }> = [];
+  const seenKeys = new Set<string>();
+  let duplicateCount = 0;
 
-          // 평점 검증 (선택)
-          if (detail?.rating !== undefined) {
-            kakaoRating = this.validateRating(detail.rating);
-          }
-        }
+  console.log(`\n🔍 ${places.length}개의 장소 검증 시작...`);
+  if (strictMode) {
+    console.log('  ⚠️  엄격 모드: 라멘 관련 키워드 필터링 활성화');
+  }
 
-        // Shop 객체 생성
-        const shop: ValidatedShop = {
-          id: place.id,
-          name: place.place_name,
-          address: place.road_address_name || place.address_name,
-          lat: parseFloat(place.y),
-          lng: parseFloat(place.x),
-          kakaoPlaceUrl: this.normalizeKakaoPlaceUrl(place.place_url),
-          phone: place.phone || undefined,
-          instagramUrl,
-          kakaoRating,
-        };
+  for (const place of places) {
+    // 1. 좌표 파싱 검증
+    const lat = parseFloat(place.y);
+    const lng = parseFloat(place.x);
 
-        valid.push(shop);
-      } catch (error) {
-        invalid.push({
-          placeId: place.id,
-          placeName: place.place_name,
-          reason: error instanceof Error ? error.message : String(error),
-          originalData: place,
-        });
-      }
-    }
-
-    console.log(`✅ 검증 완료: ${valid.length}개 유효, ${invalid.length}개 실패\n`);
-
-    if (invalid.length > 0) {
-      console.log('❌ 검증 실패 항목:');
-      invalid.forEach((err) => {
-        console.log(`  - ${err.placeName} (${err.placeId}): ${err.reason}`);
+    if (isNaN(lat) || isNaN(lng)) {
+      invalid.push({
+        place,
+        reason: '좌표 파싱 실패',
       });
-      console.log('');
+      continue;
     }
 
-    return { valid, invalid };
+    // 2. 한국 영역 검증
+    if (!isValidKoreaCoordinates(lat, lng)) {
+      invalid.push({
+        place,
+        reason: `좌표가 한국 영역 밖 (lat: ${lat}, lng: ${lng})`,
+      });
+      continue;
+    }
+
+    // 3. 필수 필드 검증
+    if (!place.place_name || !place.address_name) {
+      invalid.push({
+        place,
+        reason: '필수 필드 누락 (이름 또는 주소)',
+      });
+      continue;
+    }
+
+    // 4. 라멘 관련 키워드 검증 (strictMode일 경우만)
+    if (strictMode && !isRamenRelated(place)) {
+      invalid.push({
+        place,
+        reason: '라멘 관련 키워드 미포함',
+      });
+      continue;
+    }
+
+    // 5. 중복 체크 (이름 + 주소 기반)
+    const shopKey = generateShopKey(place.place_name, place.address_name);
+    if (seenKeys.has(shopKey)) {
+      duplicateCount++;
+      continue;
+    }
+    seenKeys.add(shopKey);
+
+    // 6. 변환 및 추가
+    const validatedShop = transformKakaoPlaceToShop(place);
+    valid.push(validatedShop);
   }
 
-  /**
-   * 필수 필드 검증
-   *
-   * @param place Kakao Place 객체
-   * @throws 필수 필드 누락 시 에러
-   */
-  private validateRequiredFields(place: KakaoPlace): void {
-    if (!place.id) {
-      throw new Error('Place ID가 없습니다');
-    }
+  console.log(`✅ 검증 완료:`);
+  console.log(`   - 유효: ${valid.length}개`);
+  console.log(`   - 무효: ${invalid.length}개`);
+  console.log(`   - 중복: ${duplicateCount}개`);
 
-    if (!place.place_name || place.place_name.trim() === '') {
-      throw new Error('가게 이름이 없습니다');
-    }
+  if (invalid.length > 0) {
+    console.log(`\n⚠️  무효한 데이터 상세:`);
+    const reasonCounts = invalid.reduce(
+      (acc, item) => {
+        acc[item.reason] = (acc[item.reason] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
-    if (!place.address_name && !place.road_address_name) {
-      throw new Error('주소 정보가 없습니다');
-    }
-
-    if (!place.x || !place.y) {
-      throw new Error('좌표 정보가 없습니다');
-    }
+    Object.entries(reasonCounts).forEach(([reason, count]) => {
+      console.log(`   - ${reason}: ${count}개`);
+    });
   }
 
-  /**
-   * 좌표 유효성 검증
-   *
-   * @param x 경도 (longitude)
-   * @param y 위도 (latitude)
-   * @throws 좌표가 유효하지 않으면 에러
-   */
-  private validateCoordinates(x: string, y: string): void {
-    const lng = parseFloat(x);
-    const lat = parseFloat(y);
+  return {
+    valid,
+    invalid,
+    duplicates: duplicateCount,
+  };
+}
 
-    if (isNaN(lng) || isNaN(lat)) {
-      throw new Error('좌표가 숫자가 아닙니다');
-    }
-
-    // 한국 좌표 범위 검증 (대략적)
-    // 위도: 33° ~ 43°
-    // 경도: 124° ~ 132°
-    if (lat < 33 || lat > 43) {
-      throw new Error(`위도가 범위를 벗어났습니다: ${lat}`);
-    }
-
-    if (lng < 124 || lng > 132) {
-      throw new Error(`경도가 범위를 벗어났습니다: ${lng}`);
-    }
-  }
-
-  /**
-   * 전화번호 유효성 검증
-   *
-   * @param phone 전화번호
-   * @throws 전화번호가 유효하지 않으면 에러
-   */
-  private validatePhone(phone: string): void {
-    // 간단한 전화번호 형식 검증 (숫자, 하이픈만 허용)
-    const phoneRegex = /^[0-9-]+$/;
-
-    if (!phoneRegex.test(phone)) {
-      throw new Error(`전화번호 형식이 올바르지 않습니다: ${phone}`);
-    }
-  }
-
-  private normalizeKakaoPlaceUrl(url: string): string | undefined {
-    if (!url) {
-      return undefined;
-    }
-
-    return url.replace(/^http:\/\/place\.map\.kakao\.com\//, 'https://place.map.kakao.com/');
-  }
-
-  /**
-   * Instagram URL 유효성 검증
-   *
-   * @param url Instagram URL
-   * @returns 검증된 URL (정규화됨)
-   * @throws URL이 유효하지 않으면 에러
-   */
-  private validateInstagramUrl(url: string): string | undefined {
-    if (!url || url.trim() === '') {
-      return undefined;
-    }
-
-    try {
-      const urlObj = new URL(url);
-
-      // Instagram 도메인 검증
-      if (
-        urlObj.hostname !== 'www.instagram.com' &&
-        urlObj.hostname !== 'instagram.com' &&
-        urlObj.hostname !== 'instagr.am'
-      ) {
-        throw new Error(`Instagram URL이 아닙니다: ${url}`);
-      }
-
-      // 정규화된 URL 반환
-      return url;
-    } catch (error) {
-      throw new Error(`URL 형식이 올바르지 않습니다: ${url}`);
-    }
-  }
-
-  /**
-   * 카카오 맵 평점 유효성 검증
-   *
-   * @param rating 평점 (0-5)
-   * @returns 검증된 평점
-   * @throws 평점이 유효하지 않으면 에러
-   */
-  private validateRating(rating: number): number | undefined {
-    if (rating === undefined || rating === null) {
-      return undefined;
-    }
-
-    if (isNaN(rating)) {
-      throw new Error(`평점이 숫자가 아닙니다: ${rating}`);
-    }
-
-    if (rating < 0 || rating > 5) {
-      throw new Error(`평점이 범위를 벗어났습니다 (0-5): ${rating}`);
-    }
-
-    // 소수점 1자리로 반올림
-    return Math.round(rating * 10) / 10;
-  }
-
-  /**
-   * 중복 제거 (Place ID 기준)
-   *
-   * @param shops ValidatedShop 배열
-   * @returns 중복 제거된 배열
-   */
-  deduplicate(shops: ValidatedShop[]): ValidatedShop[] {
-    const seen = new Set<string>();
-    const unique: ValidatedShop[] = [];
-
-    for (const shop of shops) {
-      if (!seen.has(shop.id)) {
-        seen.add(shop.id);
-        unique.push(shop);
-      }
-    }
-
-    const removedCount = shops.length - unique.length;
-    if (removedCount > 0) {
-      console.log(`🔄 중복 제거: ${removedCount}개 제거됨 (${unique.length}개 남음)\n`);
-    }
-
-    return unique;
-  }
+/**
+ * 검증 결과 요약 출력
+ */
+export function printValidationSummary(result: ValidationResult): void {
+  console.log(`\n📊 검증 요약:`);
+  console.log(`   총 처리: ${result.valid.length + result.invalid.length + result.duplicates}개`);
+  console.log(`   ✅ 유효: ${result.valid.length}개`);
+  console.log(`   ❌ 무효: ${result.invalid.length}개`);
+  console.log(`   🔄 중복: ${result.duplicates}개`);
+  console.log(`   📈 성공률: ${((result.valid.length / (result.valid.length + result.invalid.length)) * 100).toFixed(1)}%\n`);
 }
