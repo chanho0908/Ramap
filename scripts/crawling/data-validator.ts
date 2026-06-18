@@ -7,12 +7,13 @@
 import type { KakaoPlace } from './kakao-api';
 
 export interface ValidatedShop {
+  kakao_place_id?: string;
   name: string;
   address: string;
   lat: number;
   lng: number;
   phone?: string;
-  description?: string;
+  kakao_place_url?: string;
   business_hours?: string;
 }
 
@@ -60,10 +61,9 @@ function isRamenRelated(place: KakaoPlace): boolean {
     '라멘가게',
   ];
 
-  const searchText =
-    `${place.place_name} ${place.category_name}`.toLowerCase();
+  const searchText = `${place.place_name} ${place.category_name}`.toLowerCase();
 
-  return ramenKeywords.some(keyword =>
+  return ramenKeywords.some((keyword) =>
     searchText.includes(keyword.toLowerCase())
   );
 }
@@ -82,18 +82,14 @@ function transformKakaoPlaceToShop(place: KakaoPlace): ValidatedShop {
   const lat = parseFloat(place.y);
   const lng = parseFloat(place.x);
 
-  // description: Kakao Map 링크 포함
-  const description = place.place_url
-    ? `카카오맵: ${place.place_url}`
-    : undefined;
-
   return {
+    kakao_place_id: place.id || undefined,
     name: place.place_name,
     address: place.road_address_name || place.address_name,
     lat,
     lng,
     phone: place.phone || undefined,
-    description,
+    kakao_place_url: place.place_url || undefined,
     business_hours: undefined, // Kakao API에서 제공하지 않음
   };
 }
@@ -203,10 +199,18 @@ export function validateAndTransformPlaces(
  * 검증 결과 요약 출력
  */
 export function printValidationSummary(result: ValidationResult): void {
+  const processedCount =
+    result.valid.length + result.invalid.length + result.duplicates;
+  const validationCount = result.valid.length + result.invalid.length;
+  const successRate =
+    validationCount === 0
+      ? '0.0'
+      : ((result.valid.length / validationCount) * 100).toFixed(1);
+
   console.log(`\n📊 검증 요약:`);
-  console.log(`   총 처리: ${result.valid.length + result.invalid.length + result.duplicates}개`);
+  console.log(`   총 처리: ${processedCount}개`);
   console.log(`   ✅ 유효: ${result.valid.length}개`);
   console.log(`   ❌ 무효: ${result.invalid.length}개`);
   console.log(`   🔄 중복: ${result.duplicates}개`);
-  console.log(`   📈 성공률: ${((result.valid.length / (result.valid.length + result.invalid.length)) * 100).toFixed(1)}%\n`);
+  console.log(`   📈 성공률: ${successRate}%\n`);
 }

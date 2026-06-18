@@ -7,7 +7,7 @@
 
 import puppeteer, { Browser, Page } from 'puppeteer';
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface SocialLinks {
   instagram?: string;
@@ -19,6 +19,64 @@ export interface PlaceDetail {
   placeId: string;
   socialLinks: SocialLinks;
   rating?: number;
+}
+
+export function normalizeInstagramProfileUrl(url: string): string | undefined {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase().replace(/^m\./, 'www.');
+
+    if (hostname === 'instagr.am') {
+      urlObj.hostname = 'www.instagram.com';
+    } else if (
+      hostname === 'instagram.com' ||
+      hostname === 'www.instagram.com'
+    ) {
+      urlObj.hostname = 'www.instagram.com';
+    } else {
+      return undefined;
+    }
+
+    const pathSegments = urlObj.pathname
+      .split('/')
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+
+    if (pathSegments.length !== 1) {
+      return undefined;
+    }
+
+    const username = pathSegments[0];
+    const reservedPaths = new Set([
+      'accounts',
+      'explore',
+      'p',
+      'reel',
+      'reels',
+      'stories',
+      'tv',
+    ]);
+
+    const instagramUsernamePattern =
+      /^[A-Za-z0-9](?:[A-Za-z0-9._]{0,28}[A-Za-z0-9])?$/;
+
+    if (
+      reservedPaths.has(username.toLowerCase()) ||
+      !instagramUsernamePattern.test(username) ||
+      username.includes('..')
+    ) {
+      return undefined;
+    }
+
+    urlObj.protocol = 'https:';
+    urlObj.pathname = `/${username}/`;
+    urlObj.search = '';
+    urlObj.hash = '';
+
+    return urlObj.toString();
+  } catch (error) {
+    return undefined;
+  }
 }
 
 export class KakaoDetailScraper {
@@ -237,8 +295,10 @@ export class KakaoDetailScraper {
       for (const href of links) {
         // Instagram 링크 감지
         if (href.includes('instagram.com') || href.includes('instagr.am')) {
-          if (!socialLinks.instagram) {
-            socialLinks.instagram = this.normalizeInstagramUrl(href);
+          const instagramUrl = normalizeInstagramProfileUrl(href);
+
+          if (!socialLinks.instagram && instagramUrl) {
+            socialLinks.instagram = instagramUrl;
           }
         }
 
@@ -250,10 +310,7 @@ export class KakaoDetailScraper {
         }
 
         // 블로그 링크 감지 (Naver, Tistory 등)
-        if (
-          href.includes('blog.naver.com') ||
-          href.includes('tistory.com')
-        ) {
+        if (href.includes('blog.naver.com') || href.includes('tistory.com')) {
           if (!socialLinks.blog) {
             socialLinks.blog = href;
           }
@@ -271,32 +328,6 @@ export class KakaoDetailScraper {
     } catch (error) {
       console.log(`  ℹ️  소셜 링크 추출 실패`);
       return {};
-    }
-  }
-
-  /**
-   * Instagram URL 정규화
-   *
-   * @param url 원본 Instagram URL
-   * @returns 정규화된 URL
-   */
-  private normalizeInstagramUrl(url: string): string {
-    try {
-      const urlObj = new URL(url);
-
-      // 단축 URL (instagr.am) → 정식 URL (instagram.com)
-      if (urlObj.hostname === 'instagr.am') {
-        urlObj.hostname = 'www.instagram.com';
-      }
-
-      // 쿼리 파라미터 제거 (추적 파라미터 등)
-      urlObj.search = '';
-      urlObj.hash = '';
-
-      return urlObj.toString();
-    } catch (error) {
-      // URL 파싱 실패 시 원본 반환
-      return url;
     }
   }
 }
