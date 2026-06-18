@@ -202,10 +202,25 @@ git checkout -b feature/123-add-shop-markers
 - ✅ 기타 모든 AI 코딩 도구
 
 ### 모델 중립적 작동 원리
-1. **표준 마크다운 형식**: 모든 Agent 정의는 `.md` 파일
+1. **공통 역할 문서**: Canonical Agent 정의는 `.codex/agents/tier1/*.md`, `.codex/agents/tier2/*.md` 파일
 2. **범용 CLI 명령어**: git, gh, pnpm 등 표준 도구
 3. **명시적 프롬프트**: 모델별 API가 아닌 자연어 지침
-4. **도구 독립적**: 특정 IDE 기능에 의존하지 않음
+4. **도구별 어댑터**: Codex는 `.codex/agents/*.toml`, Claude Code는 `.claude/agents/*.md` 사용
+5. **도구 독립적**: 특정 IDE 기능에 의존하지 않음
+
+### Tool-specific Subagent Adapters
+
+Ramap Agent 역할은 하나이며, 도구별 파일은 같은 역할 문서를 가리키는 얇은 어댑터입니다.
+
+| 도구 | 네이티브 위치 | 기준 역할 문서 |
+|------|---------------|----------------|
+| Codex | `.codex/agents/<agent>.toml` | `.codex/agents/tier1/*.md`, `.codex/agents/tier2/*.md` |
+| Claude Code | `.claude/agents/<agent>.md` | `.codex/agents/tier1/*.md`, `.codex/agents/tier2/*.md` |
+
+**규칙**:
+- 새 역할을 추가할 때는 먼저 기준 역할 문서를 작성합니다.
+- Codex/Claude 어댑터는 역할 요약, 트리거 설명, 도구 권한, 기준 문서 경로만 포함합니다.
+- 역할 정책을 변경할 때는 기준 역할 문서를 먼저 수정하고 어댑터에는 필요한 최소 변경만 반영합니다.
 
 ### Agent 호출 방법 (모델 무관)
 ```
