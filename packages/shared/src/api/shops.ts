@@ -3,9 +3,39 @@
  */
 
 import { supabase } from './supabase';
-import type { Shop, Location, ShopRow } from '../types';
+import type { Shop, Location, MapBounds, ShopRow } from '../types';
 import { mapShopRowToShop } from '../mappers/shop';
 import { getBoundingBox } from '../utils/location';
+
+async function fetchShopsInBounds(
+  bounds: MapBounds,
+  logContext: string
+): Promise<Shop[]> {
+  try {
+    const { data, error } = await supabase
+      .from('shops')
+      .select('*')
+      .gte('lat', bounds.minLat)
+      .lte('lat', bounds.maxLat)
+      .gte('lng', bounds.minLng)
+      .lte('lng', bounds.maxLng)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error(`[${logContext} Error]`, error);
+      throw new Error(`가게 데이터를 가져올 수 없습니다: ${error.message}`);
+    }
+
+    if (!data) {
+      return [];
+    }
+
+    return (data as ShopRow[]).map(mapShopRowToShop);
+  } catch (error) {
+    console.error(`[${logContext} Error]`, error);
+    throw error;
+  }
+}
 
 /**
  * 주변 가게 조회
@@ -24,34 +54,29 @@ export async function fetchNearbyShops(
   location: Location,
   radiusKm: number = 5
 ): Promise<Shop[]> {
-  try {
-    // Bounding box 계산 (간단한 방식, PostGIS 불필요)
-    const box = getBoundingBox(location, radiusKm);
+  // Bounding box 계산 (간단한 방식, PostGIS 불필요)
+  const box = getBoundingBox(location, radiusKm);
+  return fetchShopsInBounds(box, 'fetchNearbyShops');
+}
 
-    // Supabase 쿼리
-    const { data, error } = await supabase
-      .from('shops')
-      .select('*')
-      .gte('lat', box.minLat)
-      .lte('lat', box.maxLat)
-      .gte('lng', box.minLng)
-      .lte('lng', box.maxLng)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[fetchNearbyShops Error]', error);
-      throw new Error(`가게 데이터를 가져올 수 없습니다: ${error.message}`);
-    }
-
-    if (!data) {
-      return [];
-    }
-
-    return (data as ShopRow[]).map(mapShopRowToShop);
-  } catch (error) {
-    console.error('[fetchNearbyShops Error]', error);
-    throw error;
-  }
+/**
+ * 지도 표시 영역 기준 가게 조회
+ *
+ * @param bounds 지도 표시 영역의 상하좌우 좌표
+ * @returns 가게 목록
+ *
+ * @example
+ * ```ts
+ * const shops = await fetchShopsByBounds({
+ *   minLat: 37.5,
+ *   maxLat: 37.6,
+ *   minLng: 126.9,
+ *   maxLng: 127.0,
+ * });
+ * ```
+ */
+export async function fetchShopsByBounds(bounds: MapBounds): Promise<Shop[]> {
+  return fetchShopsInBounds(bounds, 'fetchShopsByBounds');
 }
 
 /**

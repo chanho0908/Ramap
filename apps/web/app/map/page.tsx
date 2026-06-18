@@ -7,8 +7,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MapView } from '@/components/map/MapView';
 import { useGeolocation } from '@/hooks/useGeolocation';
-import { useNearbyShops } from '@/hooks/useNearbyShops';
+import { useShopsByBounds } from '@/hooks/useShopsByBounds';
 import { filterShopsByQuery, normalizeShopSearchQuery } from '@ramap/shared';
+import type { Location, MapBounds } from '@ramap/shared';
 
 // 기본 위치: 서울시청
 const DEFAULT_LOCATION = { lat: 37.5665, lng: 126.978 };
@@ -16,12 +17,13 @@ const DEFAULT_LOCATION = { lat: 37.5665, lng: 126.978 };
 export default function MapPage() {
   const { location, error: geoError, loading: geoLoading } = useGeolocation();
   const [searchQuery, setSearchQuery] = useState('');
-  const [mapCenter, setMapCenter] = useState<typeof DEFAULT_LOCATION>(DEFAULT_LOCATION);
+  const [mapCenter, setMapCenter] = useState<Location>(DEFAULT_LOCATION);
+  const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
   const {
     shops,
     loading: isLoadingShops,
     error: shopsError,
-  } = useNearbyShops(mapCenter, 5);
+  } = useShopsByBounds(mapBounds);
 
   // GPS 위치 변경 시 지도 중심 업데이트 (초기 한 번만)
   useEffect(() => {
@@ -38,10 +40,22 @@ export default function MapPage() {
 
   const hasSearchQuery = normalizedSearchQuery.length > 0;
 
-  // 지도 이동 핸들러
-  const handleMapMove = useCallback((newCenter: typeof DEFAULT_LOCATION) => {
-    setMapCenter(newCenter);
-  }, []);
+  const handleBoundsChange = useCallback(
+    (bounds: MapBounds, center: Location) => {
+      setMapBounds(bounds);
+      setMapCenter((currentCenter) => {
+        if (
+          currentCenter.lat === center.lat &&
+          currentCenter.lng === center.lng
+        ) {
+          return currentCenter;
+        }
+
+        return center;
+      });
+    },
+    []
+  );
 
   return (
     <div className="h-screen flex flex-col">
@@ -55,10 +69,10 @@ export default function MapPage() {
                 <span className="inline-block animate-spin rounded-full h-3 w-3 border-b border-gray-600" />
                 위치 확인 중...
               </span>
+            ) : hasSearchQuery ? (
+              `검색 결과 ${filteredShops.length}곳 / 주변 ${shops.length}곳`
             ) : (
-              hasSearchQuery
-                ? `검색 결과 ${filteredShops.length}곳 / 주변 ${shops.length}곳`
-                : `주변 라멘 가게 ${shops.length}곳`
+              `주변 라멘 가게 ${shops.length}곳`
             )}
           </p>
         </div>
@@ -104,7 +118,7 @@ export default function MapPage() {
           center={mapCenter}
           shops={filteredShops}
           zoom={3}
-          onMapMove={handleMapMove}
+          onBoundsChange={handleBoundsChange}
         />
 
         {/* 가게 로딩 오버레이 */}
@@ -133,7 +147,9 @@ export default function MapPage() {
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 max-w-sm text-center">
             <div className="text-4xl mb-3">🍜</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {hasSearchQuery ? '검색 결과가 없습니다' : '주변에 가게가 없습니다'}
+              {hasSearchQuery
+                ? '검색 결과가 없습니다'
+                : '주변에 가게가 없습니다'}
             </h3>
             <p className="text-sm text-gray-600">
               {hasSearchQuery

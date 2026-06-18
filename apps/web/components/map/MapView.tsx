@@ -5,7 +5,7 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import type { Shop, Location } from '@ramap/shared';
+import type { Shop, Location, MapBounds } from '@ramap/shared';
 import { loadKakaoMaps, handleKakaoMapError } from '@/lib/kakao-maps';
 import { createShopMarker, removeMarkers } from './ShopMarker';
 import type { ShopMarkerInstance } from './ShopMarker';
@@ -16,15 +16,24 @@ interface MapViewProps {
   shops: Shop[];
   onMarkerClick?: (shop: Shop) => void;
   onMapMove?: (newCenter: Location) => void; // 지도 이동 시 콜백
+  onBoundsChange?: (bounds: MapBounds, center: Location) => void;
   zoom?: number; // Kakao Maps level (작을수록 확대, 기본 3)
+}
+
+interface KakaoLatLng {
+  getLat: () => number;
+  getLng: () => number;
+}
+
+interface KakaoLatLngBounds {
+  getSouthWest: () => KakaoLatLng;
+  getNorthEast: () => KakaoLatLng;
 }
 
 interface KakaoMapInstance {
   setCenter: (center: unknown) => void;
-  getCenter: () => {
-    getLat: () => number;
-    getLng: () => number;
-  };
+  getCenter: () => KakaoLatLng;
+  getBounds: () => KakaoLatLngBounds;
 }
 
 /**
@@ -44,6 +53,7 @@ export function MapView({
   shops,
   onMarkerClick,
   onMapMove,
+  onBoundsChange,
   zoom = 3, // 기본값: level 3 (확대된 상태)
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -82,17 +92,36 @@ export function MapView({
           options
         ) as KakaoMapInstance;
 
-        // 지도 드래그 종료 이벤트 리스너 (지도 이동 시 재검색)
-        if (onMapMove) {
-          kakao.maps.event.addListener(mapInstance, 'dragend', () => {
-            const latlng = mapInstance.getCenter();
-            const newCenter = {
-              lat: latlng.getLat(),
-              lng: latlng.getLng(),
-            };
+        const notifyMapPosition = () => {
+          const latlng = mapInstance.getCenter();
+          const newCenter = {
+            lat: latlng.getLat(),
+            lng: latlng.getLng(),
+          };
+
+          if (onMapMove) {
             onMapMove(newCenter);
-          });
-        }
+          }
+
+          if (onBoundsChange) {
+            const mapBounds = mapInstance.getBounds();
+            const southWest = mapBounds.getSouthWest();
+            const northEast = mapBounds.getNorthEast();
+
+            onBoundsChange(
+              {
+                minLat: southWest.getLat(),
+                maxLat: northEast.getLat(),
+                minLng: southWest.getLng(),
+                maxLng: northEast.getLng(),
+              },
+              newCenter
+            );
+          }
+        };
+
+        notifyMapPosition();
+        kakao.maps.event.addListener(mapInstance, 'idle', notifyMapPosition);
 
         setMap(mapInstance);
         setIsLoading(false);
@@ -107,7 +136,7 @@ export function MapView({
     };
 
     initMap();
-  }, [onMapMove]);
+  }, [onBoundsChange, onMapMove]);
 
   // 중심 위치 변경
   useEffect(() => {
@@ -153,7 +182,6 @@ export function MapView({
       }
     };
   }, [map, shops, selectedShop?.id, onMarkerClick]);
-
 
   return (
     <div className="relative w-full h-full">

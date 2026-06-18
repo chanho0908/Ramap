@@ -4,6 +4,13 @@ export interface Location {
   lng: number;
 }
 
+export interface MapBounds {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
 export interface Shop {
   id: string;
   kakaoPlaceId?: string;
