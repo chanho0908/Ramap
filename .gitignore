@@ -53,3 +53,6 @@ supabase/.branches/
 
 # Build outputs
 *.tsbuildinfo
+
+# Generated crawling reports
+reports/

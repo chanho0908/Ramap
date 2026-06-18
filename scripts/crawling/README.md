@@ -96,6 +96,42 @@ pnpm crawl:shops:dry-run
 
 데이터베이스에 저장하지 않고 검증만 수행합니다. 처음 실행 시 권장합니다.
 
+### Instagram 정보 보강
+
+```bash
+pnpm crawl:instagram
+```
+
+기존 `shops` 테이블의 `kakao_place_url` 또는 `kakao_place_id`를 이용해 Kakao Place 상세 페이지를 열고, 매장 Instagram 프로필 URL을 찾아 `instagram_url`에 저장합니다.
+
+처음 실행할 때는 일부 매장만 dry-run으로 확인하는 것을 권장합니다:
+
+```bash
+pnpm crawl:instagram:dry-run -- --limit 10
+```
+
+주요 옵션:
+
+| 옵션                  | 설명                                           | 기본값             |
+| --------------------- | ---------------------------------------------- | ------------------ |
+| `--dry-run`           | DB 업데이트 없이 스크래핑과 리포트 생성만 수행 | `false`            |
+| `--limit <number>`    | 처리할 Shop 최대 개수                          | 전체               |
+| `--delay-ms <number>` | Kakao 상세 페이지 요청 간 지연                 | `1500`             |
+| `--missing-only`      | `instagram_url`이 비어 있는 Shop만 처리        | `false`            |
+| `--headful`           | Puppeteer 브라우저를 화면에 표시               | `false`            |
+| `--report-dir <path>` | 리포트 저장 경로                               | `reports/crawling` |
+
+실행 후 Instagram이 있는 매장과 없는 매장은 별도 파일로 분리됩니다:
+
+```text
+reports/crawling/instagram-<timestamp>/
+├── shops-with-instagram.json
+├── shops-with-instagram.csv
+├── shops-without-instagram.json
+├── shops-without-instagram.csv
+└── summary.json
+```
+
 ### 실행 결과 예시
 
 ```
@@ -185,17 +221,17 @@ pnpm crawl:shops:dry-run
 
 ### 환경 변수 상세 설명
 
-| 변수 | 설명 | 기본값 | 예시 |
-|------|------|--------|------|
-| `KAKAO_REST_API_KEY` | Kakao REST API 키 (필수) | - | `abcd1234efgh...` |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL (필수) | - | `https://xxx.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Service Role 키 (권장) | - | `eyJhbGci...` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase Anon 키 (대체) | - | `eyJhbGci...` |
-| `KAKAO_REQUEST_DELAY_MS` | API 요청 간 지연 (ms) | 500 | 1000 |
-| `MAX_PAGES_PER_KEYWORD` | 키워드당 최대 페이지 수 | 3 | 5 |
-| `BATCH_SIZE` | 배치 삽입 크기 | 50 | 100 |
-| `UPSERT_MODE` | 중복 시 업데이트 여부 | false | true |
-| `STRICT_MODE` | 엄격한 필터링 모드 | false | true |
+| 변수                            | 설명                            | 기본값 | 예시                      |
+| ------------------------------- | ------------------------------- | ------ | ------------------------- |
+| `KAKAO_REST_API_KEY`            | Kakao REST API 키 (필수)        | -      | `abcd1234efgh...`         |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase 프로젝트 URL (필수)    | -      | `https://xxx.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Supabase Service Role 키 (권장) | -      | `eyJhbGci...`             |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase Anon 키 (대체)         | -      | `eyJhbGci...`             |
+| `KAKAO_REQUEST_DELAY_MS`        | API 요청 간 지연 (ms)           | 500    | 1000                      |
+| `MAX_PAGES_PER_KEYWORD`         | 키워드당 최대 페이지 수         | 3      | 5                         |
+| `BATCH_SIZE`                    | 배치 삽입 크기                  | 50     | 100                       |
+| `UPSERT_MODE`                   | 중복 시 업데이트 여부           | false  | true                      |
+| `STRICT_MODE`                   | 엄격한 필터링 모드              | false  | true                      |
 
 ### 검색 키워드 커스터마이징
 
@@ -232,6 +268,7 @@ export const MAJOR_CITIES = [
 **원인**: `.env.local` 파일에 Kakao API 키가 없거나 잘못 설정됨
 
 **해결 방법**:
+
 1. 프로젝트 루트에 `.env.local` 파일이 있는지 확인
 2. `KAKAO_REST_API_KEY=your-key` 형식으로 올바르게 설정
 3. 키에 따옴표나 공백이 없는지 확인
@@ -241,6 +278,7 @@ export const MAJOR_CITIES = [
 **원인**: Supabase URL 또는 키가 잘못됨
 
 **해결 방법**:
+
 1. Supabase Dashboard에서 Project URL과 API 키를 다시 확인
 2. `.env.local`에 올바른 값 설정
 3. `service_role` 키를 사용하는 경우 RLS 정책 확인
@@ -250,6 +288,7 @@ export const MAJOR_CITIES = [
 **원인**: Kakao API 키가 유효하지 않음
 
 **해결 방법**:
+
 1. Kakao Developers에서 앱이 활성화되어 있는지 확인
 2. REST API 키를 다시 복사하여 `.env.local`에 붙여넣기
 3. API 키에 불필요한 공백이나 문자가 없는지 확인
@@ -259,6 +298,7 @@ export const MAJOR_CITIES = [
 **원인**: 이미 존재하는 데이터를 다시 삽입하려고 함
 
 **해결 방법**:
+
 1. `UPSERT_MODE=true` 설정하여 중복 시 업데이트
 2. 또는 기존 데이터를 Supabase Studio에서 삭제 후 재실행
 
@@ -267,6 +307,7 @@ export const MAJOR_CITIES = [
 **원인**: 라멘과 무관한 장소가 많이 검색됨
 
 **해결 방법**:
+
 1. `--strict` 옵션 사용: `pnpm crawl:shops:strict`
 2. 또는 `STRICT_MODE=true` 환경 변수 설정
 3. `config.ts`에서 검색 키워드를 더 구체적으로 수정
@@ -276,7 +317,9 @@ export const MAJOR_CITIES = [
 ```
 scripts/crawling/
 ├── crawl-shops.ts       # 메인 실행 파일
+├── crawl-instagram-info.ts # Shop Instagram URL 보강 및 리포트 생성
 ├── kakao-api.ts         # Kakao Places API 클라이언트
+├── kakao-detail-scraper.ts # Kakao Place 상세 페이지 스크래퍼
 ├── data-validator.ts    # 데이터 검증 및 변환
 ├── db-importer.ts       # Supabase 배치 저장
 ├── config.ts            # 설정 파일
