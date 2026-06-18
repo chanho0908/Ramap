@@ -7,3 +7,10 @@ export * from './api/shops';
 
 // Export utils
 export * from './utils/location';
+export * from './utils/shop-search';
+
+// Export mappers
+export * from './mappers/shop';
+
+// Export constants
+export * from './constants/marker';

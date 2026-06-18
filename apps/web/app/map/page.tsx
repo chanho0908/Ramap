@@ -4,46 +4,44 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MapView } from '@/components/map/MapView';
 import { useGeolocation } from '@/hooks/useGeolocation';
-import { fetchNearbyShops } from '@ramap/shared';
-import type { Shop } from '@ramap/shared';
+import { useNearbyShops } from '@/hooks/useNearbyShops';
+import { filterShopsByQuery, normalizeShopSearchQuery } from '@ramap/shared';
 
 // 기본 위치: 서울시청
 const DEFAULT_LOCATION = { lat: 37.5665, lng: 126.978 };
 
 export default function MapPage() {
   const { location, error: geoError, loading: geoLoading } = useGeolocation();
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [isLoadingShops, setIsLoadingShops] = useState(false);
-  const [shopsError, setShopsError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [mapCenter, setMapCenter] = useState<typeof DEFAULT_LOCATION>(DEFAULT_LOCATION);
+  const {
+    shops,
+    loading: isLoadingShops,
+    error: shopsError,
+  } = useNearbyShops(mapCenter, 5);
 
-  // 중심 위치: 현재 위치 또는 기본 위치
-  const center = location || DEFAULT_LOCATION;
-
-  // 가게 데이터 가져오기
+  // GPS 위치 변경 시 지도 중심 업데이트 (초기 한 번만)
   useEffect(() => {
-    const loadShops = async () => {
-      try {
-        setIsLoadingShops(true);
-        setShopsError(null);
-        const data = await fetchNearbyShops(center, 5); // 5km 반경
-        setShops(data);
-      } catch (err) {
-        console.error('[Map Page] Failed to load shops:', err);
-        setShopsError(
-          err instanceof Error
-            ? err.message
-            : '가게 정보를 불러올 수 없습니다.'
-        );
-      } finally {
-        setIsLoadingShops(false);
-      }
-    };
+    if (location) {
+      setMapCenter(location);
+    }
+  }, [location]);
 
-    loadShops();
-  }, [center.lat, center.lng]);
+  const normalizedSearchQuery = normalizeShopSearchQuery(searchQuery);
+  const filteredShops = useMemo(
+    () => filterShopsByQuery(shops, searchQuery),
+    [shops, searchQuery]
+  );
+
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+
+  // 지도 이동 핸들러
+  const handleMapMove = useCallback((newCenter: typeof DEFAULT_LOCATION) => {
+    setMapCenter(newCenter);
+  }, []);
 
   return (
     <div className="h-screen flex flex-col">
@@ -58,7 +56,9 @@ export default function MapPage() {
                 위치 확인 중...
               </span>
             ) : (
-              `주변 라멘 가게 ${shops.length}곳`
+              hasSearchQuery
+                ? `검색 결과 ${filteredShops.length}곳 / 주변 ${shops.length}곳`
+                : `주변 라멘 가게 ${shops.length}곳`
             )}
           </p>
         </div>
@@ -69,9 +69,43 @@ export default function MapPage() {
         )}
       </header>
 
+      <section className="bg-white border-b border-gray-200 px-4 py-3">
+        <label htmlFor="shop-search" className="sr-only">
+          라멘 가게 검색
+        </label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+            검색
+          </span>
+          <input
+            id="shop-search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            type="search"
+            placeholder="가게명, 주소, 전화번호"
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-12 pr-10 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+              aria-label="검색어 지우기"
+            >
+              지우기
+            </button>
+          )}
+        </div>
+      </section>
+
       {/* 지도 */}
       <main className="flex-1 relative">
-        <MapView center={center} shops={shops} zoom={3} />
+        <MapView
+          center={mapCenter}
+          shops={filteredShops}
+          zoom={3}
+          onMapMove={handleMapMove}
+        />
 
         {/* 가게 로딩 오버레이 */}
         {isLoadingShops && (
@@ -95,14 +129,16 @@ export default function MapPage() {
         )}
 
         {/* 가게 없음 메시지 */}
-        {!isLoadingShops && !shopsError && shops.length === 0 && (
+        {!isLoadingShops && !shopsError && filteredShops.length === 0 && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 max-w-sm text-center">
             <div className="text-4xl mb-3">🍜</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              주변에 가게가 없습니다
+              {hasSearchQuery ? '검색 결과가 없습니다' : '주변에 가게가 없습니다'}
             </h3>
             <p className="text-sm text-gray-600">
-              다른 지역을 검색하거나 지도를 이동해보세요.
+              {hasSearchQuery
+                ? '검색어를 바꾸거나 지우면 주변 가게를 다시 볼 수 있습니다.'
+                : '다른 지역을 검색하거나 지도를 이동해보세요.'}
             </p>
           </div>
         )}

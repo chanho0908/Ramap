@@ -17,23 +17,29 @@ authority: canonical
 
 **속성**:
 - `id`: 고유 식별자
+- `kakaoPlaceId`: 카카오맵 장소 ID (선택)
 - `name`: 가게 이름
 - `address`: 주소
 - `location`: 위치 (위도/경도)
-- `description`: 설명 (선택)
+- `kakaoPlaceUrl`: 카카오맵 장소 URL (선택)
 - `phone`: 전화번호 (선택)
 - `businessHours`: 영업시간 (선택)
+- `instagramUrl`: 인스타그램 프로필 URL (선택)
+- `kakaoRating`: 카카오 맵 공식 평점 0-5점 (선택)
 
 **코드 표현**:
 ```typescript
 interface Shop {
   id: string;
+  kakaoPlaceId?: string;
   name: string;
   address: string;
   location: Location;
-  description?: string;
+  kakaoPlaceUrl?: string;
   phone?: string;
   businessHours?: string;
+  instagramUrl?: string;
+  kakaoRating?: number;
   createdAt: string;
   updatedAt: string;
 }

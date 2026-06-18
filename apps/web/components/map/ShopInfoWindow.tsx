@@ -24,7 +24,7 @@ interface ShopInfoWindowProps {
  */
 export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
   return (
-    <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-4 max-w-sm z-10 animate-fade-in">
+    <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl p-5 w-11/12 max-w-md z-30 animate-fade-in border border-gray-100">
       {/* 닫기 버튼 */}
       <button
         onClick={onClose}
@@ -46,21 +46,72 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
 
       {/* 가게 정보 */}
       <div className="pr-6">
-        <h3 className="font-bold text-lg text-gray-900 mb-2">{shop.name}</h3>
-        <p className="text-sm text-gray-600 mb-1">{shop.address}</p>
-        {shop.phone && (
-          <p className="text-sm text-gray-600 mb-1">
-            <span className="font-medium">전화:</span> {shop.phone}
+        {/* 헤더 */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1">
+            <h3 className="font-bold text-xl text-gray-900 mb-1 flex items-center gap-2">
+              🍜 {shop.name}
+            </h3>
+            {shop.kakaoRating && shop.kakaoRating > 0 && (
+              <div className="inline-flex items-center gap-1 bg-yellow-50 px-3 py-1 rounded-full border border-yellow-200">
+                <span className="text-yellow-600 font-semibold text-sm">
+                  ⭐ {shop.kakaoRating.toFixed(1)}
+                </span>
+                <span className="text-xs text-yellow-700">카카오 평점</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 기본 정보 */}
+        <div className="space-y-2 mb-3">
+          <p className="text-sm text-gray-700 flex items-start gap-2">
+            <span className="text-gray-400">📍</span>
+            <span className="flex-1">{shop.address}</span>
           </p>
-        )}
-        {shop.businessHours && (
-          <p className="text-sm text-gray-600 mb-1">
-            <span className="font-medium">영업시간:</span> {shop.businessHours}
-          </p>
-        )}
-        {shop.description && (
-          <p className="text-sm text-gray-700 mt-2 pt-2 border-t border-gray-200">
-            {shop.description}
+          {shop.phone && (
+            <p className="text-sm text-gray-700 flex items-center gap-2">
+              <span className="text-gray-400">📞</span>
+              <a
+                href={`tel:${shop.phone}`}
+                className="text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                {shop.phone}
+              </a>
+            </p>
+          )}
+          {shop.businessHours && (
+            <p className="text-sm text-gray-700 flex items-start gap-2">
+              <span className="text-gray-400">🕒</span>
+              <span className="flex-1">{shop.businessHours}</span>
+            </p>
+          )}
+          {shop.instagramUrl && (
+            <p className="text-sm flex items-center gap-2">
+              <span className="text-gray-400">📷</span>
+              <a
+                href={shop.instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-600 hover:text-purple-800 hover:underline font-medium"
+              >
+                Instagram
+              </a>
+            </p>
+          )}
+        </div>
+
+        {/* 카카오맵 링크 */}
+        {shop.kakaoPlaceUrl && (
+          <p className="text-sm mt-3 pt-3 border-t border-gray-200">
+            <a
+              href={shop.kakaoPlaceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+            >
+              카카오맵에서 보기
+            </a>
           </p>
         )}
       </div>

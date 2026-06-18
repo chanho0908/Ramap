@@ -2,7 +2,7 @@
  * Web Geolocation API 훅
  */
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import type { Location } from '@ramap/shared';
 
 interface UseGeolocationReturn {
@@ -30,7 +30,7 @@ export function useGeolocation(): UseGeolocationReturn {
   const [error, setError] = useState<GeolocationPositionError | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const requestLocation = () => {
+  const requestLocation = useCallback(() => {
     setLoading(true);
     setError(null);
 
@@ -66,11 +66,11 @@ export function useGeolocation(): UseGeolocationReturn {
         maximumAge: 0,
       }
     );
-  };
+  }, []);
 
   useEffect(() => {
     requestLocation();
-  }, []);
+  }, [requestLocation]);
 
   return {
     location,

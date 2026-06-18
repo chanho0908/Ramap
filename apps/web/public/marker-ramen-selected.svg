@@ -1,0 +1,31 @@
+<svg width="44" height="49" viewBox="0 0 44 49" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 마커 핀 바디 (선택 상태 - 진한 빨간색, 크기 증가) -->
+  <g filter="url(#shadow)">
+    <!-- 원형 상단 -->
+    <circle cx="22" cy="20" r="18" fill="#CC0000" stroke="#FFFFFF" stroke-width="3"/>
+
+    <!-- 하단 삼각형 -->
+    <path d="M 22 38 L 13 24 L 31 24 Z" fill="#CC0000"/>
+
+    <!-- 라면 이모지 -->
+    <text x="22" y="25" font-size="20" text-anchor="middle" dominant-baseline="middle">🍜</text>
+
+    <!-- 선택 효과 링 -->
+    <circle cx="22" cy="20" r="20" stroke="#CC0000" stroke-width="2" fill="none" opacity="0.3"/>
+  </g>
+
+  <!-- 그림자 필터 (선택 시 가장 진하게) -->
+  <defs>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.5"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>

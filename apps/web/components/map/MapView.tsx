@@ -8,13 +8,23 @@ import { useRef, useEffect, useState } from 'react';
 import type { Shop, Location } from '@ramap/shared';
 import { loadKakaoMaps, handleKakaoMapError } from '@/lib/kakao-maps';
 import { createShopMarker, removeMarkers } from './ShopMarker';
+import type { ShopMarkerInstance } from './ShopMarker';
 import { ShopInfoWindow } from './ShopInfoWindow';
 
 interface MapViewProps {
   center: Location;
   shops: Shop[];
   onMarkerClick?: (shop: Shop) => void;
-  zoom?: number;
+  onMapMove?: (newCenter: Location) => void; // 지도 이동 시 콜백
+  zoom?: number; // Kakao Maps level (작을수록 확대, 기본 3)
+}
+
+interface KakaoMapInstance {
+  setCenter: (center: unknown) => void;
+  getCenter: () => {
+    getLat: () => number;
+    getLng: () => number;
+  };
 }
 
 /**
@@ -33,11 +43,14 @@ export function MapView({
   center,
   shops,
   onMarkerClick,
-  zoom = 15,
+  onMapMove,
+  zoom = 3, // 기본값: level 3 (확대된 상태)
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<any>(null); // kakao.maps.Map
-  const [markers, setMarkers] = useState<any[]>([]); // kakao.maps.Marker[]
+  const initialCenterRef = useRef(center);
+  const initialZoomRef = useRef(zoom);
+  const markersRef = useRef<ShopMarkerInstance[]>([]);
+  const [map, setMap] = useState<KakaoMapInstance | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,15 +68,32 @@ export function MapView({
         await loadKakaoMaps();
 
         const { kakao } = window;
+        const initialCenter = initialCenterRef.current;
 
         // 지도 옵션
         const options = {
-          center: new kakao.maps.LatLng(center.lat, center.lng),
-          level: zoom,
+          center: new kakao.maps.LatLng(initialCenter.lat, initialCenter.lng),
+          level: initialZoomRef.current,
         };
 
         // 지도 생성
-        const mapInstance = new kakao.maps.Map(mapRef.current, options);
+        const mapInstance = new kakao.maps.Map(
+          mapRef.current,
+          options
+        ) as KakaoMapInstance;
+
+        // 지도 드래그 종료 이벤트 리스너 (지도 이동 시 재검색)
+        if (onMapMove) {
+          kakao.maps.event.addListener(mapInstance, 'dragend', () => {
+            const latlng = mapInstance.getCenter();
+            const newCenter = {
+              lat: latlng.getLat(),
+              lng: latlng.getLng(),
+            };
+            onMapMove(newCenter);
+          });
+        }
+
         setMap(mapInstance);
         setIsLoading(false);
       } catch (err) {
@@ -77,7 +107,7 @@ export function MapView({
     };
 
     initMap();
-  }, []);
+  }, [onMapMove]);
 
   // 중심 위치 변경
   useEffect(() => {
@@ -93,25 +123,37 @@ export function MapView({
     if (!map || !window.kakao) return;
 
     // 기존 마커 제거
-    removeMarkers(markers);
+    removeMarkers(markersRef.current);
 
-    // 새 마커 생성
-    const newMarkers = shops.map((shop) =>
-      createShopMarker(map, shop, (clickedShop) => {
-        setSelectedShop(clickedShop);
-        if (onMarkerClick) {
-          onMarkerClick(clickedShop);
-        }
-      })
-    );
+    // 모든 가게를 개별 마커로 표시
+    const newMarkers: ShopMarkerInstance[] = [];
 
-    setMarkers(newMarkers.filter(Boolean));
+    shops.forEach((shop) => {
+      const marker = createShopMarker(
+        map,
+        shop,
+        (clickedShop) => {
+          setSelectedShop(clickedShop);
+          if (onMarkerClick) {
+            onMarkerClick(clickedShop);
+          }
+        },
+        selectedShop?.id === shop.id
+      );
+      if (marker) newMarkers.push(marker);
+    });
 
-    // Cleanup: 컴포넌트 언마운트 시 마커 제거
+    markersRef.current = newMarkers;
+
+    // Cleanup
     return () => {
       removeMarkers(newMarkers);
+      if (markersRef.current === newMarkers) {
+        markersRef.current = [];
+      }
     };
-  }, [map, shops]);
+  }, [map, shops, selectedShop?.id, onMarkerClick]);
+
 
   return (
     <div className="relative w-full h-full">

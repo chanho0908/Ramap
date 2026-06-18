@@ -24,6 +24,7 @@ export const SEARCH_KEYWORDS = [
 export const MAJOR_CITIES = [
   { name: '서울', keywords: ['서울 라멘', '강남 라멘', '홍대 라멘'] },
   { name: '부산', keywords: ['부산 라멘', '해운대 라멘'] },
+  { name: '경기', keywords: ['수원 라멘'] },
   { name: '대구', keywords: ['대구 라멘'] },
   { name: '인천', keywords: ['인천 라멘'] },
   { name: '광주', keywords: ['광주 라멘'] },
@@ -101,6 +102,108 @@ export function loadCrawlConfig(): CrawlConfig {
     upsertMode: process.env.UPSERT_MODE === 'true',
   };
 }
+
+/**
+ * 제외 키워드 (Blacklist)
+ * 이 키워드들이 포함된 가게는 라멘집이 아닐 가능성이 높습니다.
+ *
+ * ⚠️ 주의: "소바" 제거됨
+ * 이유: 츄카소바(중화소바), 아부라소바, 칸다소바 등은 실제 라멘집
+ */
+export const EXCLUDE_KEYWORDS = [
+  // 일본 음식 (라멘 제외)
+  '돈가스',
+  '돈까스',
+  '카츠',
+  '라면',    // 한국식 라면 (라멘 제외)
+  '카레',
+  '이자카야',
+  '스시',
+  '초밥',
+  '우동',
+  '덮밥',
+  '규동',
+  // '소바',  // 제거: 라멘 관련 소바가 많음 (츄카소바, 아부라소바 등)
+  '튀김',
+  '야키니쿠',
+  '샤브샤브',
+  '텐동',
+  '오야코동',
+
+  // 양식
+  '오므라이스',
+  '스테이크',
+  '햄버그',
+  '파스타',
+  '피자',
+
+  // 한식
+  '김밥',
+  '분식',
+
+  // 기타
+  '베이커리',
+  '카페',
+  '디저트',
+] as const;
+
+/**
+ * 포함 키워드 (Whitelist)
+ * 라멘집이라면 이 중 최소 하나는 포함되어야 합니다.
+ */
+export const INCLUDE_KEYWORDS = [
+  // 기본 라멘 키워드
+  '라멘',
+  'ラーメン',
+  'ramen',
+  '일본라멘',
+  '라멘야',
+
+  // 라멘 종류
+  '츠케멘',
+  '돈코츠',
+  '미소라멘',
+  '쇼유라멘',
+  '시오라멘',
+  '탄탄멘',
+
+  // 소바 계열 라멘 (실제로는 라멘집)
+  '츄카소바',      // 중화소바 = 라멘의 다른 이름
+  '중화소바',
+  '아부라소바',    // 유소바/마제소바 = 라멘 변형
+  '유소바',
+  '마제소바',
+  '칸다소바',      // 라멘 전문점 체인
+  '멘야',          // 麺屋 = 라멘집을 뜻함
+] as const;
+
+/**
+ * 의심 패턴
+ * 제외 키워드와 포함 키워드가 동시에 있는 경우 수동 검증 필요
+ */
+export interface SuspiciousPattern {
+  exclude: string;
+  include: string;
+  description: string;
+}
+
+export const SUSPICIOUS_PATTERNS: SuspiciousPattern[] = [
+  {
+    exclude: '돈가스',
+    include: '라멘',
+    description: '라멘과 돈가스를 함께 판매하는 식당 (예: "라멘바 돈가스")',
+  },
+  {
+    exclude: '카레',
+    include: '라멘',
+    description: '라멘과 카레를 함께 판매하는 식당',
+  },
+  {
+    exclude: '우동',
+    include: '라멘',
+    description: '라멘과 우동을 함께 판매하는 식당',
+  },
+];
 
 /**
  * 설정 출력 (디버깅용)
