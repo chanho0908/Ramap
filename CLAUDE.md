@@ -17,7 +17,7 @@ Ramap (라맵) is a map-based ramen shop discovery platform for ramen enthusiast
 **⚠️ This repository uses an AI Agent orchestration system. You MUST follow these rules:**
 
 1. **Read AGENTS.md first** - It contains the top-level orchestration policy
-2. **Never work alone** - Delegate all tasks to specialized agents in `.codex/agents/`
+2. **Never work alone** - Delegate all tasks to specialized agents
 3. **Follow the standard workflow** - Issue → Branch → Plan → Implement → Test → Commit → PR
 4. **Always create feature branches** - Never commit directly to `develop` or `main`
 5. **Use Korean for commit messages** - Type/scope in English, subject/body in Korean
@@ -31,8 +31,12 @@ Ramap (라맵) is a map-based ramen shop discovery platform for ramen enthusiast
 | "계획", "설계", "어떻게" | planner | `.codex/agents/tier2/planner.md` |
 | "구현", "만들어", "추가" | implementer | `.codex/agents/tier2/implementer.md` |
 | "테스트" | tester | `.codex/agents/tier2/tester.md` |
+| "리뷰", "검토" | code-reviewer | `.codex/agents/tier2/code-reviewer.md` |
 | "커밋" | committer | `.codex/agents/tier2/committer.md` |
 | "PR", "Pull Request" | pr-creator | `.codex/agents/tier2/pr-creator.md` |
+
+Canonical role prompts live under `.codex/agents/tier1/` and `.codex/agents/tier2/`.
+Codex native adapters live in `.codex/agents/*.toml`, and Claude Code native project subagents live in `.claude/agents/*.md`.
 
 **Workflow example:**
 ```bash
@@ -42,7 +46,7 @@ gh issue create --title "feat(map): add shop markers"
 # 2. Create feature branch
 git checkout -b feature/42-add-shop-markers
 
-# 3. planner → implementer → tester → committer → pr-creator
+# 3. planner → implementer → tester → code-reviewer → committer → pr-creator
 # 4. User reviews and merges on GitHub
 ```
 
@@ -135,7 +139,8 @@ Ramap/
 ├── wiki/                 # Project knowledge base
 │   ├── reference/        # Technical docs (domain-glossary, architecture)
 │   └── operations/       # Workflows and procedures
-└── .codex/agents/        # AI Agent definitions
+├── .codex/agents/        # Canonical role docs and Codex native TOML adapters
+└── .claude/agents/       # Claude Code native project subagents
 ```
 
 ### Domain Model
