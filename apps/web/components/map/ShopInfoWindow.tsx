@@ -101,10 +101,17 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
           )}
         </div>
 
-        {/* 설명 */}
-        {shop.description && (
-          <p className="text-sm text-gray-600 mt-3 pt-3 border-t border-gray-200 leading-relaxed">
-            {shop.description}
+        {/* 카카오맵 링크 */}
+        {shop.kakaoPlaceUrl && (
+          <p className="text-sm mt-3 pt-3 border-t border-gray-200">
+            <a
+              href={shop.kakaoPlaceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+            >
+              카카오맵에서 보기
+            </a>
           </p>
         )}
       </div>

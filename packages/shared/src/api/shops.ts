@@ -3,7 +3,8 @@
  */
 
 import { supabase } from './supabase';
-import type { Shop, Location } from '../types';
+import type { Shop, Location, ShopRow } from '../types';
+import { mapShopRowToShop } from '../mappers/shop';
 import { getBoundingBox } from '../utils/location';
 
 /**
@@ -46,26 +47,7 @@ export async function fetchNearbyShops(
       return [];
     }
 
-    // snake_case → camelCase 변환 및 타입 매핑
-    const shops: Shop[] = data.map((row) => ({
-      id: row.id,
-      kakaoPlaceId: row.kakao_place_id || undefined,
-      name: row.name,
-      address: row.address,
-      location: {
-        lat: row.lat,
-        lng: row.lng,
-      },
-      kakaoPlaceUrl: row.kakao_place_url || undefined,
-      phone: row.phone || undefined,
-      businessHours: row.business_hours || undefined,
-      instagramUrl: row.instagram_url || undefined,
-      kakaoRating: row.kakao_rating || undefined,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
-
-    return shops;
+    return (data as ShopRow[]).map(mapShopRowToShop);
   } catch (error) {
     console.error('[fetchNearbyShops Error]', error);
     throw error;
@@ -103,26 +85,7 @@ export async function fetchShopById(id: string): Promise<Shop | null> {
       return null;
     }
 
-    // snake_case → camelCase 변환
-    const shop: Shop = {
-      id: data.id,
-      kakaoPlaceId: data.kakao_place_id || undefined,
-      name: data.name,
-      address: data.address,
-      location: {
-        lat: data.lat,
-        lng: data.lng,
-      },
-      kakaoPlaceUrl: data.kakao_place_url || undefined,
-      phone: data.phone || undefined,
-      businessHours: data.business_hours || undefined,
-      instagramUrl: data.instagram_url || undefined,
-      kakaoRating: data.kakao_rating || undefined,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    };
-
-    return shop;
+    return mapShopRowToShop(data as ShopRow);
   } catch (error) {
     console.error('[fetchShopById Error]', error);
     return null;

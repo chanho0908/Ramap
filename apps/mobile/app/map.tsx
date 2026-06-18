@@ -2,7 +2,7 @@
  * 지도 화면 (Mobile)
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { ShopMapView } from '@/components/map/MapView';
 import { useLocation } from '@/hooks/useLocation';
@@ -19,11 +19,12 @@ export default function MapScreen() {
 
   // 중심 위치: 현재 위치 또는 기본 위치
   const center = location || DEFAULT_LOCATION;
+  const { lat: centerLat, lng: centerLng } = center;
 
   // 초기 권한 요청
   useEffect(() => {
     requestPermission();
-  }, []);
+  }, [requestPermission]);
 
   // 가게 데이터 가져오기
   useEffect(() => {
@@ -31,7 +32,7 @@ export default function MapScreen() {
       try {
         setIsLoadingShops(true);
         setShopsError(null);
-        const data = await fetchNearbyShops(center, 5); // 5km 반경
+        const data = await fetchNearbyShops({ lat: centerLat, lng: centerLng }, 5); // 5km 반경
         setShops(data);
       } catch (err) {
         console.error('[Map Screen] Failed to load shops:', err);
@@ -47,7 +48,12 @@ export default function MapScreen() {
     };
 
     loadShops();
-  }, [center.lat, center.lng]);
+  }, [centerLat, centerLng]);
+
+  const handleMarkerPress = useCallback(() => {
+    // Phase 2-2: 상세 페이지 이동
+    // navigation.navigate('ShopDetail', { shopId: shop.id });
+  }, []);
 
   // 위치 에러 알림
   useEffect(() => {
@@ -80,11 +86,7 @@ export default function MapScreen() {
         <ShopMapView
           center={center}
           shops={shops}
-          onMarkerPress={(shop) => {
-            console.log('[Map Screen] Marker pressed:', shop.name);
-            // Phase 2-2: 상세 페이지 이동
-            // navigation.navigate('ShopDetail', { shopId: shop.id });
-          }}
+          onMarkerPress={handleMarkerPress}
         />
 
         {/* 가게 로딩 오버레이 */}

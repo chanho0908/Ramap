@@ -19,6 +19,22 @@ export interface Shop {
   updatedAt: string;
 }
 
+export interface ShopRow {
+  id: string;
+  kakao_place_id: string | null;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  kakao_place_url: string | null;
+  phone: string | null;
+  business_hours: string | null;
+  instagram_url: string | null;
+  kakao_rating: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Review types
 export interface Review {
   id: string;

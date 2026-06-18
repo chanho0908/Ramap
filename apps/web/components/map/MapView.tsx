@@ -7,11 +7,8 @@
 import { useRef, useEffect, useState } from 'react';
 import type { Shop, Location } from '@ramap/shared';
 import { loadKakaoMaps, handleKakaoMapError } from '@/lib/kakao-maps';
-import {
-  createShopMarker,
-  updateMarkerState,
-  removeMarkers,
-} from './ShopMarkerSimple';
+import { createShopMarker, removeMarkers } from './ShopMarker';
+import type { ShopMarkerInstance } from './ShopMarker';
 import { ShopInfoWindow } from './ShopInfoWindow';
 
 interface MapViewProps {
@@ -20,6 +17,14 @@ interface MapViewProps {
   onMarkerClick?: (shop: Shop) => void;
   onMapMove?: (newCenter: Location) => void; // 지도 이동 시 콜백
   zoom?: number; // Kakao Maps level (작을수록 확대, 기본 3)
+}
+
+interface KakaoMapInstance {
+  setCenter: (center: unknown) => void;
+  getCenter: () => {
+    getLat: () => number;
+    getLng: () => number;
+  };
 }
 
 /**
@@ -42,8 +47,10 @@ export function MapView({
   zoom = 3, // 기본값: level 3 (확대된 상태)
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<any>(null); // kakao.maps.Map
-  const [markers, setMarkers] = useState<any[]>([]); // kakao.maps.Marker[]
+  const initialCenterRef = useRef(center);
+  const initialZoomRef = useRef(zoom);
+  const markersRef = useRef<ShopMarkerInstance[]>([]);
+  const [map, setMap] = useState<KakaoMapInstance | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,15 +68,19 @@ export function MapView({
         await loadKakaoMaps();
 
         const { kakao } = window;
+        const initialCenter = initialCenterRef.current;
 
         // 지도 옵션
         const options = {
-          center: new kakao.maps.LatLng(center.lat, center.lng),
-          level: zoom,
+          center: new kakao.maps.LatLng(initialCenter.lat, initialCenter.lng),
+          level: initialZoomRef.current,
         };
 
         // 지도 생성
-        const mapInstance = new kakao.maps.Map(mapRef.current, options);
+        const mapInstance = new kakao.maps.Map(
+          mapRef.current,
+          options
+        ) as KakaoMapInstance;
 
         // 지도 드래그 종료 이벤트 리스너 (지도 이동 시 재검색)
         if (onMapMove) {
@@ -79,7 +90,6 @@ export function MapView({
               lat: latlng.getLat(),
               lng: latlng.getLng(),
             };
-            console.log('[MapView] Map dragged to:', newCenter);
             onMapMove(newCenter);
           });
         }
@@ -97,7 +107,7 @@ export function MapView({
     };
 
     initMap();
-  }, []);
+  }, [onMapMove]);
 
   // 중심 위치 변경
   useEffect(() => {
@@ -112,13 +122,11 @@ export function MapView({
   useEffect(() => {
     if (!map || !window.kakao) return;
 
-    console.log('[MapView] Rendering markers for', shops.length, 'shops');
-
     // 기존 마커 제거
-    removeMarkers(markers);
+    removeMarkers(markersRef.current);
 
     // 모든 가게를 개별 마커로 표시
-    const newMarkers: any[] = [];
+    const newMarkers: ShopMarkerInstance[] = [];
 
     shops.forEach((shop) => {
       const marker = createShopMarker(
@@ -135,13 +143,16 @@ export function MapView({
       if (marker) newMarkers.push(marker);
     });
 
-    setMarkers(newMarkers);
+    markersRef.current = newMarkers;
 
     // Cleanup
     return () => {
       removeMarkers(newMarkers);
+      if (markersRef.current === newMarkers) {
+        markersRef.current = [];
+      }
     };
-  }, [map, shops, selectedShop?.id]);
+  }, [map, shops, selectedShop?.id, onMarkerClick]);
 
 
   return (

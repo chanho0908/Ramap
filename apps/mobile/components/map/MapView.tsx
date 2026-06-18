@@ -99,13 +99,6 @@ export function ShopMapView({
                   <Text style={styles.calloutText}>🕒 {shop.businessHours}</Text>
                 )}
 
-                {/* 설명 */}
-                {shop.description && (
-                  <Text style={styles.calloutDescription} numberOfLines={3}>
-                    {shop.description}
-                  </Text>
-                )}
-
                 {/* 인스타그램 */}
                 {shop.instagramUrl && (
                   <Text style={styles.calloutInstagram}>📷 Instagram</Text>
@@ -194,15 +187,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#4b5563',
     marginBottom: 4,
-    lineHeight: 18,
-  },
-  calloutDescription: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
     lineHeight: 18,
   },
   calloutInstagram: {
