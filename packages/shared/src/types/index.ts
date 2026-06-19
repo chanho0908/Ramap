@@ -15,6 +15,7 @@ export interface Shop {
   businessHours?: string;
   instagramUrl?: string;
   kakaoRating?: number;
+  menuCategoryIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +32,7 @@ export interface ShopRow {
   business_hours: string | null;
   instagram_url: string | null;
   kakao_rating: number | null;
+  menu_category_ids: string[] | null;
   created_at: string;
   updated_at: string;
 }
