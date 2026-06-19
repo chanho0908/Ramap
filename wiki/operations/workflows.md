@@ -289,6 +289,7 @@ pnpm test
 
 **실행 조건**:
 - 사용자 명시적 요청: "커밋해줘"
+- 통합 실행 요청: "커밋하고 PR까지", "commit/push/PR 해줘", `/ship`
 - 구현 + 테스트 완료
 
 **커밋 메시지 형식** (한국어):
@@ -325,6 +326,9 @@ EOF
 
 **중요**: Type과 Scope는 영어, Subject와 Body는 **한국어**로 작성합니다.
 
+**통합 실행**:
+명시적 통합 요청이 있으면 커밋 완료 후 별도 확인 없이 Step 8의 push 및 Draft PR 생성으로 이어집니다.
+
 **실행**:
 ```bash
 # 변경 파일 확인
@@ -348,7 +352,14 @@ git log -1
 
 **실행 조건**:
 - 사용자 명시적 요청: "PR 만들어줘"
+- 통합 실행 요청: "커밋하고 PR까지", "commit/push/PR 해줘", `/ship`
 - 커밋 완료
+
+**승인 규칙**:
+- 개별 PR 요청이 있으면 push 및 Draft PR 생성이 승인된 것으로 봅니다.
+- 통합 실행 요청이 있으면 `committer` 이후 `pr-creator`까지 연속 실행하도록 승인된 것으로 봅니다.
+- PR은 항상 Draft PR로 생성합니다.
+- PR 병합은 자동 실행하지 않으며 사람이 최종 리뷰 후 병합합니다.
 
 **실행**:
 ```bash
@@ -427,16 +438,19 @@ https://github.com/chanho0908/Ramap/pull/43
 **간소화 가능**:
 - ✅ 이슈 생략 가능
 - ✅ planner 생략 가능
-- ❌ 커밋/PR 승인은 필수
+- ✅ 명시적 통합 요청 시 커밋 → push → Draft PR 생성 연속 실행
+- ❌ PR 병합은 항상 사람이 수행
 
 **예시**:
 ```
 사용자: "README 오타 수정해줘"
 
 워크플로우:
-1. implementer: README 수정
-2. committer: 커밋
-3. pr-creator: PR 생성 (또는 직접 develop 푸시)
+1. writer: README 수정
+2. 사용자: "커밋하고 PR까지 해줘"
+3. committer: 커밋
+4. pr-creator: 원격 브랜치 push 및 Draft PR 생성
+5. 사람: 최종 리뷰 및 병합
 ```
 
 ---
@@ -445,24 +459,31 @@ https://github.com/chanho0908/Ramap/pull/43
 
 ### 패턴 1: 새 기능 (Full Workflow)
 ```
-이슈 → 브랜치 → planner → implementer → tester → committer → PR → 병합
+이슈 → 브랜치 → planner → implementer → tester → committer → push → Draft PR → 사람 병합
 ```
 
 ### 패턴 2: 버그 수정
 ```
-이슈 → 브랜치 → implementer → tester → committer → PR → 병합
+이슈 → 브랜치 → implementer → tester → committer → push → Draft PR → 사람 병합
 (planner 생략 가능)
 ```
 
 ### 패턴 3: 문서 업데이트
 ```
-(이슈 생략) → 브랜치 → writer → committer → PR → 병합
+(이슈 생략) → 브랜치 → writer → committer → push → Draft PR → 사람 병합
 ```
 
 ### 패턴 4: 급한 수정 (Hotfix)
 ```
-이슈 → hotfix 브랜치 → implementer → committer → PR → main & develop 병합
+이슈 → hotfix 브랜치 → implementer → committer → push → Draft PR → 사람 병합
 ```
+
+### 패턴 5: 통합 실행
+```
+사용자 통합 요청(`/ship`, "커밋하고 PR까지") → committer → push → pr-creator(Draft PR) → 사람 병합
+```
+
+**참고**: 통합 실행은 개별 `committer`와 `pr-creator` 역할을 없애지 않습니다. 사용자가 명시적으로 요청한 경우에만 두 역할을 연속 실행합니다.
 
 ---
 
@@ -487,5 +508,5 @@ git push
 
 ---
 
-**최종 업데이트**: 2026-06-16
+**최종 업데이트**: 2026-06-20
 **버전**: 1.0.0

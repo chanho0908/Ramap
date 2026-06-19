@@ -31,6 +31,7 @@
 | "리뷰", "검토" | `code-reviewer` | 코드 리뷰 (READ-ONLY) |
 | "커밋", "변경사항 저장" | `committer` | Git 커밋 생성 |
 | "PR", "Pull Request" | `pr-creator` | PR 생성 및 push |
+| "커밋하고 PR까지", "commit/push/PR", "/ship" | `committer` → `pr-creator` | 커밋, push, Draft PR 생성 통합 실행 |
 
 **상세 라우팅 규칙**: `wiki/operations/routing-rules.md`
 
@@ -118,8 +119,14 @@ git checkout -b feature/123-add-shop-markers
 
 #### 8. PR 생성 (pr-creator)
 - Draft PR 자동 생성
-- 사용자 승인 필요
+- 사용자 승인 필요 (명시적 "PR 만들어줘" 또는 통합 요청 시 자동 승인)
 - develop 브랜치로 병합 요청
+
+#### 9. 통합 실행 (committer → pr-creator)
+- 명시적 통합 요청이 있으면 `committer` 이후 `pr-creator`까지 연속 실행
+- 예: "커밋하고 PR까지", "commit/push/PR 해줘", `/ship`
+- 커밋 생성, 원격 브랜치 push, Draft PR 생성은 통합 요청으로 승인된 것으로 간주
+- PR 병합은 자동 실행하지 않으며 사람이 최종 리뷰 후 병합
 
 ---
 
@@ -145,7 +152,8 @@ git checkout -b feature/123-add-shop-markers
 | 계획 수립 | ✅ 필요 | 모호하거나 큰 작업만 |
 | 코드 구현 | ⚠️ 조건부 | 명확한 "구현해줘" 요청은 자동 승인 |
 | 커밋 생성 | ✅ 필요 | 명시적 "커밋해줘" 요청 시 자동 |
-| PR 생성 | ✅ 필요 | 항상 사용자 승인 필요 |
+| push 및 PR 생성 | ✅ 필요 | 명시적 "PR 만들어줘" 또는 통합 요청 시 자동 |
+| 통합 실행 | ✅ 필요 | "커밋하고 PR까지", "commit/push/PR 해줘", `/ship` 요청 시 커밋 → push → Draft PR 생성 자동 |
 | PR 병합 | ✅ 필수 | **AI는 절대 병합하지 않음** |
 
 **명확한 구현 요청 예시** (자동 승인):
@@ -186,7 +194,7 @@ git checkout -b feature/123-add-shop-markers
 
 - 파일 1~2개, 10줄 이하 수정: 이슈/브랜치 생략 가능
 - 오타 수정, 문서 업데이트: planner 생략 가능
-- **단, 커밋 승인 규칙은 항상 유지**
+- **단, 커밋/push/PR은 명시적 개별 요청 또는 통합 요청이 있을 때만 실행**
 
 ---
 
@@ -294,14 +302,13 @@ git checkout -b feature/42-add-shop-markers
 # 6. code-reviewer 실행 (READ-ONLY)
 # 출력: 리뷰 의견
 
-# 7. 사용자: "커밋해줘"
+# 7. 사용자: "커밋하고 PR까지 해줘"
 # committer 실행
-
-# 8. 사용자: "PR 만들어줘"
+# 원격 브랜치 push
 # pr-creator 실행
 # Draft PR 생성: https://github.com/chanho0908/Ramap/pull/43
 
-# 9. 사용자가 GitHub에서 최종 리뷰 후 병합
+# 8. 사용자가 GitHub에서 최종 리뷰 후 병합
 ```
 
 ---
@@ -314,6 +321,7 @@ git checkout -b feature/42-add-shop-markers
 /impl             # 계획 → 구현 → 테스트 일괄 실행
 /commit           # 커밋 생성
 /pr               # PR 생성
+/ship             # 커밋 → push → Draft PR 생성 통합 실행
 /review           # 코드 리뷰
 ```
 
@@ -338,6 +346,6 @@ git checkout -b feature/42-add-shop-markers
 ---
 
 **버전**: 1.0.0
-**최종 업데이트**: 2026-06-16
+**최종 업데이트**: 2026-06-20
 **작성자**: Ramap Team
 **라이선스**: MIT
