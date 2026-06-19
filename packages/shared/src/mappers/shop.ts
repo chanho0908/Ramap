@@ -19,6 +19,7 @@ export function mapShopRowToShop(row: ShopRow): Shop {
     businessHours: optional(row.business_hours),
     instagramUrl: optional(row.instagram_url),
     kakaoRating: optional(row.kakao_rating),
+    menuCategoryIds: row.menu_category_ids ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

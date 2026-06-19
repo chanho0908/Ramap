@@ -33,7 +33,9 @@
     "delete:non-ramen:dry-run": "tsx scripts/crawling/delete-non-ramen-shops.ts --dry-run",
     "analyze:non-ramen": "tsx scripts/crawling/analyze-non-ramen-shops.ts",
     "analyze:non-ramen:delete": "tsx scripts/crawling/analyze-non-ramen-shops.ts --delete --dry-run",
-    "analyze:non-ramen:delete:confirm": "tsx scripts/crawling/analyze-non-ramen-shops.ts --delete --confirm"
+    "analyze:non-ramen:delete:confirm": "tsx scripts/crawling/analyze-non-ramen-shops.ts --delete --confirm",
+    "classify:menus": "tsx scripts/crawling/apply-menu-classification.ts",
+    "classify:menus:dry-run": "tsx scripts/crawling/apply-menu-classification.ts --dry-run"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
