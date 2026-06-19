@@ -2,6 +2,7 @@
  * 가게 정보창 컴포넌트
  */
 
+import { getMenuCategoryLabel } from '@ramap/shared';
 import type { Shop } from '@ramap/shared';
 
 interface ShopInfoWindowProps {
@@ -23,6 +24,11 @@ interface ShopInfoWindowProps {
  * ```
  */
 export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
+  const menuCategories = shop.menuCategoryIds.map((categoryId) => ({
+    id: categoryId,
+    label: getMenuCategoryLabel(categoryId),
+  }));
+
   return (
     <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl p-5 w-11/12 max-w-md z-30 animate-fade-in border border-gray-100">
       {/* 닫기 버튼 */}
@@ -63,6 +69,19 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
           </div>
         </div>
 
+        {menuCategories.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {menuCategories.map((category) => (
+              <span
+                key={category.id}
+                className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-100"
+              >
+                {category.label}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* 기본 정보 */}
         <div className="space-y-2 mb-3">
           <p className="text-sm text-gray-700 flex items-start gap-2">
@@ -88,7 +107,12 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
           )}
           {shop.instagramUrl && (
             <p className="text-sm flex items-center gap-2">
-              <span className="text-gray-400">📷</span>
+              <img
+                src="/instagram-icon.png"
+                alt=""
+                aria-hidden="true"
+                className="w-4 h-4"
+              />
               <a
                 href={shop.instagramUrl}
                 target="_blank"
@@ -108,8 +132,14 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
               href={shop.kakaoPlaceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline font-medium"
             >
+              <img
+                src="/kakao-map-icon.png"
+                alt=""
+                aria-hidden="true"
+                className="w-4 h-4 rounded-sm"
+              />
               카카오맵에서 보기
             </a>
           </p>

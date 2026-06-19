@@ -8,28 +8,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MapView } from '@/components/map/MapView';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useShopsByBounds } from '@/hooks/useShopsByBounds';
-import { filterShopsByQuery, normalizeShopSearchQuery } from '@ramap/shared';
+import {
+  MENU_CATEGORIES,
+  filterShopsByQuery,
+  normalizeShopSearchQuery,
+} from '@ramap/shared';
 import type { Location, MapBounds } from '@ramap/shared';
 
 // 기본 위치: 서울시청
 const DEFAULT_LOCATION = { lat: 37.5665, lng: 126.978 };
-
-const MENU_FILTERS = [
-  { id: 'tonkotsu', label: '돈코츠' },
-  { id: 'shoyu', label: '쇼유' },
-  { id: 'shio', label: '시오' },
-  { id: 'miso', label: '미소' },
-  { id: 'tori', label: '토리' },
-  { id: 'tsukemen', label: '츠케멘' },
-  { id: 'mazesoba', label: '마제소바' },
-  { id: 'aburasoba', label: '아부라소바' },
-  { id: 'jiro', label: '지로계' },
-  { id: 'niboshi_gyokai', label: '니보시/어패류' },
-  { id: 'iekei', label: '이에케' },
-  { id: 'hiyashi', label: '히야시' },
-  { id: 'chukasoba', label: '츄카소바' },
-  { id: 'tomato', label: '토마토라멘' },
-] as const;
+const GEOLOCATION_PERMISSION_DENIED = 1;
 
 function FilterIcon() {
   return (
@@ -43,10 +31,17 @@ function FilterIcon() {
 }
 
 export default function MapPage() {
-  const { location, error: geoError, loading: geoLoading } = useGeolocation();
+  const {
+    location,
+    error: geoError,
+    loading: geoLoading,
+    requestLocation,
+  } = useGeolocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMenuCategoryIds, setSelectedMenuCategoryIds] = useState<string[]>([]);
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
+  const [isLocationPermissionDialogOpen, setIsLocationPermissionDialogOpen] = useState(false);
+  const [hasRequestedCurrentLocation, setHasRequestedCurrentLocation] = useState(false);
   const [mapCenter, setMapCenter] = useState<Location>(DEFAULT_LOCATION);
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
   const {
@@ -61,6 +56,24 @@ export default function MapPage() {
       setMapCenter(location);
     }
   }, [location]);
+
+  useEffect(() => {
+    if (location && hasRequestedCurrentLocation) {
+      setIsLocationPermissionDialogOpen(false);
+      setHasRequestedCurrentLocation(false);
+    }
+  }, [hasRequestedCurrentLocation, location]);
+
+  useEffect(() => {
+    if (
+      hasRequestedCurrentLocation &&
+      !geoLoading &&
+      geoError?.code === GEOLOCATION_PERMISSION_DENIED
+    ) {
+      setIsLocationPermissionDialogOpen(true);
+      setHasRequestedCurrentLocation(false);
+    }
+  }, [geoError, geoLoading, hasRequestedCurrentLocation]);
 
   const normalizedSearchQuery = normalizeShopSearchQuery(searchQuery);
   const searchFilteredShops = useMemo(
@@ -107,6 +120,23 @@ export default function MapPage() {
         : [...current, categoryId]
     );
   }, []);
+
+  const handleMoveToCurrentLocation = useCallback(() => {
+    if (location) {
+      setMapCenter(location);
+      setIsLocationPermissionDialogOpen(false);
+      return;
+    }
+
+    setHasRequestedCurrentLocation(true);
+    requestLocation();
+  }, [location, requestLocation]);
+
+  const handleRetryLocationPermission = useCallback(() => {
+    setIsLocationPermissionDialogOpen(false);
+    setHasRequestedCurrentLocation(true);
+    requestLocation();
+  }, [requestLocation]);
 
   return (
     <div className="h-screen flex flex-col">
@@ -175,9 +205,9 @@ export default function MapPage() {
         </section>
 
         {isMoreFiltersOpen && (
-          <div className="absolute bottom-36 left-4 right-4 z-30 rounded-2xl bg-white p-3 shadow-xl ring-1 ring-black/5 sm:left-auto sm:w-96">
+          <div className="absolute bottom-52 left-4 right-4 z-30 rounded-2xl bg-white p-3 shadow-xl ring-1 ring-black/5 sm:left-auto sm:w-96">
             <div className="grid grid-cols-2 gap-2">
-              {MENU_FILTERS.map((filter) => {
+              {MENU_CATEGORIES.map((filter) => {
                 const isSelected = selectedMenuCategoryIds.includes(filter.id);
 
                 return (
@@ -227,6 +257,59 @@ export default function MapPage() {
             </span>
           )}
         </button>
+
+        <button
+          type="button"
+          onClick={handleMoveToCurrentLocation}
+          className="absolute bottom-36 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl font-semibold text-gray-800 shadow-xl ring-2 ring-white transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-70"
+          aria-label="현재 위치로 이동"
+          title="현재 위치로 이동"
+          disabled={geoLoading && hasRequestedCurrentLocation}
+        >
+          {geoLoading && hasRequestedCurrentLocation ? (
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-b-gray-800" />
+          ) : (
+            '⌖'
+          )}
+        </button>
+
+        {isLocationPermissionDialogOpen && (
+          <div
+            className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 px-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="location-permission-title"
+          >
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+              <h2
+                id="location-permission-title"
+                className="text-lg font-semibold text-gray-900"
+              >
+                위치 권한이 필요합니다
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                현재 위치로 지도를 이동하려면 브라우저 위치 권한을 허용해주세요.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsLocationPermissionDialogOpen(false)}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                >
+                  닫기
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRetryLocationPermission}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={geoLoading}
+                >
+                  다시 시도
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 가게 로딩 오버레이 */}
         {isLoadingShops && (

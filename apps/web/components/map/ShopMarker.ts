@@ -124,10 +124,16 @@ export function createShopMarker(
       white-space: nowrap;
       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
       text-align: center;
-      pointer-events: none;
+      pointer-events: auto;
+      cursor: pointer;
       margin-top: 0;
     `;
     labelContent.textContent = shop.name;
+    labelContent.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onClick(shop);
+    });
 
     const labelOverlay = new kakao.maps.CustomOverlay({
       position,

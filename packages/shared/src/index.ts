@@ -14,3 +14,4 @@ export * from './mappers/shop';
 
 // Export constants
 export * from './constants/marker';
+export * from './constants/menu-categories';

@@ -11,6 +11,8 @@ import { createShopMarker, removeMarkers } from './ShopMarker';
 import type { ShopMarkerInstance } from './ShopMarker';
 import { ShopInfoWindow } from './ShopInfoWindow';
 
+const SELECTED_SHOP_ZOOM_LEVEL = 4;
+
 interface MapViewProps {
   center: Location;
   shops: Shop[];
@@ -32,7 +34,9 @@ interface KakaoLatLngBounds {
 
 interface KakaoMapInstance {
   setCenter: (center: unknown) => void;
+  setLevel: (level: number) => void;
   getCenter: () => KakaoLatLng;
+  getLevel: () => number;
   getBounds: () => KakaoLatLngBounds;
 }
 
@@ -151,6 +155,8 @@ export function MapView({
   useEffect(() => {
     if (!map || !window.kakao) return;
 
+    const { kakao } = window;
+
     // 기존 마커 제거
     removeMarkers(markersRef.current);
 
@@ -162,6 +168,16 @@ export function MapView({
         map,
         shop,
         (clickedShop) => {
+          const markerPosition = new kakao.maps.LatLng(
+            clickedShop.location.lat,
+            clickedShop.location.lng
+          );
+
+          if (map.getLevel() > SELECTED_SHOP_ZOOM_LEVEL) {
+            map.setLevel(SELECTED_SHOP_ZOOM_LEVEL);
+          }
+
+          map.setCenter(markerPosition);
           setSelectedShop(clickedShop);
           if (onMarkerClick) {
             onMarkerClick(clickedShop);
@@ -225,12 +241,6 @@ export function MapView({
         />
       )}
 
-      {/* 가게 수 표시 (우하단) */}
-      {shops.length > 0 && !isLoading && !error && (
-        <div className="absolute bottom-4 right-4 bg-white rounded-lg shadow-md px-3 py-2 text-sm text-gray-700 z-10">
-          <span className="font-semibold">{shops.length}</span>개의 가게
-        </div>
-      )}
     </div>
   );
 }
