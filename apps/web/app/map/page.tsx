@@ -7,11 +7,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MapView } from '@/components/map/MapView';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { useShopSearch } from '@/hooks/useShopSearch';
 import { useShopsByBounds } from '@/hooks/useShopsByBounds';
 import {
   MENU_CATEGORIES,
-  filterShopsByQuery,
   normalizeShopSearchQuery,
+  searchShops,
 } from '@ramap/shared';
 import type { Location, MapBounds } from '@ramap/shared';
 
@@ -38,10 +39,14 @@ export default function MapPage() {
     requestLocation,
   } = useGeolocation();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMenuCategoryIds, setSelectedMenuCategoryIds] = useState<string[]>([]);
+  const [selectedMenuCategoryIds, setSelectedMenuCategoryIds] = useState<
+    string[]
+  >([]);
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
-  const [isLocationPermissionDialogOpen, setIsLocationPermissionDialogOpen] = useState(false);
-  const [hasRequestedCurrentLocation, setHasRequestedCurrentLocation] = useState(false);
+  const [isLocationPermissionDialogOpen, setIsLocationPermissionDialogOpen] =
+    useState(false);
+  const [hasRequestedCurrentLocation, setHasRequestedCurrentLocation] =
+    useState(false);
   const [mapCenter, setMapCenter] = useState<Location>(DEFAULT_LOCATION);
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
   const {
@@ -49,6 +54,17 @@ export default function MapPage() {
     loading: isLoadingShops,
     error: shopsError,
   } = useShopsByBounds(mapBounds);
+  const normalizedSearchQuery = normalizeShopSearchQuery(searchQuery);
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+  const {
+    shops: globalSearchShops,
+    loading: isLoadingGlobalSearch,
+    error: globalSearchError,
+  } = useShopSearch({
+    query: searchQuery,
+    menuCategoryIds: selectedMenuCategoryIds,
+    limit: 50,
+  });
 
   // GPS 위치 변경 시 지도 중심 업데이트 (초기 한 번만)
   useEffect(() => {
@@ -75,26 +91,41 @@ export default function MapPage() {
     }
   }, [geoError, geoLoading, hasRequestedCurrentLocation]);
 
-  const normalizedSearchQuery = normalizeShopSearchQuery(searchQuery);
-  const searchFilteredShops = useMemo(
-    () => filterShopsByQuery(shops, searchQuery),
-    [shops, searchQuery]
+  const searchResults = useMemo(
+    () =>
+      searchShops(hasSearchQuery ? globalSearchShops : shops, {
+        query: hasSearchQuery ? searchQuery : '',
+        menuCategoryIds: selectedMenuCategoryIds,
+      }),
+    [
+      globalSearchShops,
+      hasSearchQuery,
+      searchQuery,
+      selectedMenuCategoryIds,
+      shops,
+    ]
   );
-  const filteredShops = useMemo(() => {
-    if (selectedMenuCategoryIds.length === 0) {
-      return searchFilteredShops;
-    }
+  const filteredShops = useMemo(
+    () => searchResults.map((result) => result.shop),
+    [searchResults]
+  );
 
-    return searchFilteredShops.filter((shop) =>
-      selectedMenuCategoryIds.some((categoryId) =>
-        shop.menuCategoryIds.includes(categoryId)
-      )
-    );
-  }, [searchFilteredShops, selectedMenuCategoryIds]);
-
-  const hasSearchQuery = normalizedSearchQuery.length > 0;
   const hasSelectedFilters = selectedMenuCategoryIds.length > 0;
   const hasActiveRefinement = hasSearchQuery || hasSelectedFilters;
+  const visibleSourceShopCount = hasSearchQuery
+    ? globalSearchShops.length
+    : shops.length;
+  const isLoadingVisibleShops = hasSearchQuery
+    ? isLoadingGlobalSearch
+    : isLoadingShops;
+  const visibleShopsError = hasSearchQuery ? globalSearchError : shopsError;
+  const headerSummary = hasSearchQuery
+    ? `전체 검색 결과 ${filteredShops.length}곳${
+        hasSelectedFilters ? ` · 필터 ${selectedMenuCategoryIds.length}개` : ''
+      }`
+    : hasActiveRefinement
+      ? `검색 결과 ${filteredShops.length}곳 / 주변 ${visibleSourceShopCount}곳`
+      : `주변 라멘 가게 ${visibleSourceShopCount}곳`;
 
   const handleBoundsChange = useCallback(
     (bounds: MapBounds, center: Location) => {
@@ -150,10 +181,13 @@ export default function MapPage() {
                 <span className="inline-block animate-spin rounded-full h-3 w-3 border-b border-gray-600" />
                 위치 확인 중...
               </span>
-            ) : hasActiveRefinement ? (
-              `검색 결과 ${filteredShops.length}곳 / 주변 ${shops.length}곳`
+            ) : isLoadingGlobalSearch && hasSearchQuery ? (
+              <span className="flex items-center gap-1">
+                <span className="inline-block animate-spin rounded-full h-3 w-3 border-b border-gray-600" />
+                전체 가게 검색 중...
+              </span>
             ) : (
-              `주변 라멘 가게 ${shops.length}곳`
+              headerSummary
             )}
           </p>
         </div>
@@ -312,7 +346,7 @@ export default function MapPage() {
         )}
 
         {/* 가게 로딩 오버레이 */}
-        {isLoadingShops && (
+        {isLoadingVisibleShops && (
           <div className="absolute top-40 left-1/2 z-20 transform -translate-x-1/2 bg-white rounded-lg shadow-md px-4 py-2 flex items-center gap-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
             <span className="text-sm text-gray-700">가게 검색 중...</span>
@@ -320,9 +354,9 @@ export default function MapPage() {
         )}
 
         {/* 가게 로드 에러 */}
-        {shopsError && (
+        {visibleShopsError && (
           <div className="absolute top-40 left-1/2 z-20 transform -translate-x-1/2 bg-red-50 border border-red-200 rounded-lg shadow-md px-4 py-3 max-w-md">
-            <p className="text-sm text-red-800">{shopsError}</p>
+            <p className="text-sm text-red-800">{visibleShopsError}</p>
             <button
               onClick={() => window.location.reload()}
               className="mt-2 text-xs text-red-600 hover:text-red-800 font-medium"
@@ -333,19 +367,23 @@ export default function MapPage() {
         )}
 
         {/* 가게 없음 메시지 */}
-        {!isLoadingShops && !shopsError && filteredShops.length === 0 && (
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 max-w-sm text-center">
-            <div className="text-4xl mb-3">🍜</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {hasActiveRefinement ? '조건에 맞는 가게가 없습니다' : '주변에 가게가 없습니다'}
-            </h3>
-            <p className="text-sm text-gray-600">
-              {hasActiveRefinement
-                ? '검색어나 필터를 바꾸면 주변 가게를 다시 볼 수 있습니다.'
-                : '다른 지역을 검색하거나 지도를 이동해보세요.'}
-            </p>
-          </div>
-        )}
+        {!isLoadingVisibleShops &&
+          !visibleShopsError &&
+          filteredShops.length === 0 && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 max-w-sm text-center">
+              <div className="text-4xl mb-3">🍜</div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                {hasActiveRefinement
+                  ? '조건에 맞는 가게가 없습니다'
+                  : '주변에 가게가 없습니다'}
+              </h3>
+              <p className="text-sm text-gray-600">
+                {hasActiveRefinement
+                  ? '검색어나 필터를 바꾸면 주변 가게를 다시 볼 수 있습니다.'
+                  : '다른 지역을 검색하거나 지도를 이동해보세요.'}
+              </p>
+            </div>
+          )}
       </main>
     </div>
   );

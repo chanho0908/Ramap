@@ -6,6 +6,73 @@ import { supabase } from './supabase';
 import type { Shop, Location, MapBounds, ShopRow } from '../types';
 import { mapShopRowToShop } from '../mappers/shop';
 import { getBoundingBox } from '../utils/location';
+import { normalizeShopSearchQuery } from '../utils/shop-search';
+import { MENU_CATEGORIES } from '../constants/menu-categories';
+
+export interface FetchShopsBySearchCriteria {
+  query: string;
+  menuCategoryIds?: string[];
+  limit?: number;
+}
+
+const DEFAULT_SEARCH_LIMIT = 50;
+const SHOP_TEXT_SEARCH_COLUMNS = [
+  'name',
+  'address',
+  'phone',
+  'business_hours',
+] as const;
+
+type ShopTextSearchColumn = (typeof SHOP_TEXT_SEARCH_COLUMNS)[number];
+
+function toIlikePattern(query: string): string {
+  return `%${query.replace(/[\\%_]/g, '\\$&')}%`;
+}
+
+function getMenuCategoryIdsBySearchQuery(query: string): string[] {
+  return MENU_CATEGORIES.filter((category) => {
+    const normalizedId = normalizeShopSearchQuery(category.id);
+    const normalizedLabel = normalizeShopSearchQuery(category.label);
+
+    return normalizedId.includes(query) || normalizedLabel.includes(query);
+  }).map((category) => category.id);
+}
+
+function mergeShopRows(rows: ShopRow[][]): ShopRow[] {
+  const merged = new Map<string, ShopRow>();
+
+  rows.flat().forEach((row) => {
+    merged.set(row.id, row);
+  });
+
+  return [...merged.values()];
+}
+
+async function fetchShopRowsByTextColumn(
+  column: ShopTextSearchColumn,
+  pattern: string,
+  menuCategoryIds: string[] | undefined,
+  limit: number
+): Promise<ShopRow[]> {
+  let request = supabase
+    .from('shops')
+    .select('*')
+    .ilike(column, pattern)
+    .limit(limit);
+
+  if (menuCategoryIds && menuCategoryIds.length > 0) {
+    request = request.overlaps('menu_category_ids', menuCategoryIds);
+  }
+
+  const { data, error } = await request;
+
+  if (error) {
+    console.error('[fetchShopsBySearch Error]', error);
+    throw new Error(`가게 검색 결과를 가져올 수 없습니다: ${error.message}`);
+  }
+
+  return (data ?? []) as ShopRow[];
+}
 
 async function fetchShopsInBounds(
   bounds: MapBounds,
@@ -77,6 +144,77 @@ export async function fetchNearbyShops(
  */
 export async function fetchShopsByBounds(bounds: MapBounds): Promise<Shop[]> {
   return fetchShopsInBounds(bounds, 'fetchShopsByBounds');
+}
+
+/**
+ * 검색어 기준 전역 가게 조회
+ *
+ * @param criteria 검색어, 메뉴 카테고리 필터, 최대 조회 수
+ * @returns 가게 목록
+ */
+export async function fetchShopsBySearch(
+  criteria: FetchShopsBySearchCriteria
+): Promise<Shop[]> {
+  const normalizedQuery = normalizeShopSearchQuery(criteria.query);
+
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  try {
+    const pattern = toIlikePattern(normalizedQuery);
+    const limit = criteria.limit ?? DEFAULT_SEARCH_LIMIT;
+    const matchedMenuCategoryIds =
+      getMenuCategoryIdsBySearchQuery(normalizedQuery);
+
+    const rowGroups = await Promise.all(
+      SHOP_TEXT_SEARCH_COLUMNS.map((column) =>
+        fetchShopRowsByTextColumn(
+          column,
+          pattern,
+          criteria.menuCategoryIds,
+          limit
+        )
+      )
+    );
+
+    if (matchedMenuCategoryIds.length > 0) {
+      let menuSearchRequest = supabase
+        .from('shops')
+        .select('*')
+        .overlaps('menu_category_ids', matchedMenuCategoryIds)
+        .limit(limit);
+
+      if (criteria.menuCategoryIds && criteria.menuCategoryIds.length > 0) {
+        menuSearchRequest = menuSearchRequest.overlaps(
+          'menu_category_ids',
+          criteria.menuCategoryIds
+        );
+      }
+
+      const menuSearchResult = await menuSearchRequest;
+
+      if (menuSearchResult.error) {
+        console.error('[fetchShopsBySearch Error]', menuSearchResult.error);
+        throw new Error(
+          `가게 검색 결과를 가져올 수 없습니다: ${menuSearchResult.error.message}`
+        );
+      }
+
+      rowGroups.push((menuSearchResult.data ?? []) as ShopRow[]);
+    }
+
+    const rows = mergeShopRows(rowGroups).slice(0, limit);
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    return rows.map(mapShopRowToShop);
+  } catch (error) {
+    console.error('[fetchShopsBySearch Error]', error);
+    throw error;
+  }
 }
 
 /**
