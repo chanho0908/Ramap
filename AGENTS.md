@@ -115,10 +115,13 @@ git checkout -b feature/123-add-shop-markers
 
 #### 7. 커밋 (committer)
 - Conventional Commits 준수
+- 커밋 메시지는 한국어로 작성 (type/scope는 Conventional Commits 표기를 위해 영어 허용)
 - 사용자 승인 필요 (명시적 "커밋해줘" 요청 시 자동 승인)
 
 #### 8. PR 생성 (pr-creator)
 - Draft PR 자동 생성
+- PR 제목과 본문은 한국어로 작성
+- PR 본문에는 `## Verification` 섹션과 검증 명령어 체크리스트를 작성하지 않음
 - 사용자 승인 필요 (명시적 "PR 만들어줘" 또는 통합 요청 시 자동 승인)
 - develop 브랜치로 병합 요청
 

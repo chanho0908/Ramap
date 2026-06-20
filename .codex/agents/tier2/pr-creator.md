@@ -34,7 +34,7 @@ git push -u origin feature/42-add-shop-markers
 gh pr create \
   --base develop \
   --head feature/42-add-shop-markers \
-  --title "feat(map): add shop markers on map" \
+  --title "feat(map): 지도에 라멘집 마커 표시" \
   --body "$(cat <<'EOF'
 ## 변경 사항
 - Kakao Map SDK 통합
@@ -71,7 +71,7 @@ EOF
 
 ```markdown
 ## Summary
-간결한 변경사항 요약 (1-2문장)
+간결한 변경사항 요약 (1-2문장, 한국어)
 
 ## 주요 변경사항
 - 변경사항 1
@@ -88,8 +88,11 @@ Closes #<issue-number>
 ```
 
 **주의사항**:
+- ✅ PR 제목과 본문은 **한국어**로 작성 (type/scope는 Conventional Commits 표기를 위해 영어 허용)
 - ❌ **Notes 섹션 추가 금지** (PR 크기, 의존성, 다음 단계 등)
 - ❌ **Test Plan 섹션 추가 금지** (테스트는 코드 리뷰에서 확인)
+- ❌ **Verification 섹션 추가 금지**
+- ❌ `pnpm --filter web type-check`, `pnpm --filter web lint`, `pnpm type-check` 같은 검증 명령어 체크리스트 추가 금지
 - ✅ Summary는 간결하게 (1-2문장)
 - ✅ 주요 변경사항만 명확히
 
