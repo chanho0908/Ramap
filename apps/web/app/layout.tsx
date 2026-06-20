@@ -12,12 +12,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const kakaoMapKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
+  const hasKakaoMapKey = Boolean(
+    kakaoMapKey &&
+    kakaoMapKey !== 'your-kakao-map-key' &&
+    !kakaoMapKey.includes('your-')
+  );
 
   return (
     <html lang="ko" suppressHydrationWarning>
       <head>
-        {kakaoMapKey ? (
+        {hasKakaoMapKey ? (
           <script
+            id="kakao-map-sdk"
             src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoMapKey}&autoload=false`}
             defer
           />
