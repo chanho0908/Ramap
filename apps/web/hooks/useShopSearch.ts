@@ -12,6 +12,7 @@ interface UseShopSearchResult {
   shops: Shop[];
   loading: boolean;
   error: string | null;
+  isStale: boolean;
 }
 
 export function useShopSearch({
@@ -22,17 +23,22 @@ export function useShopSearch({
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadedCriteriaKey, setLoadedCriteriaKey] = useState<string | null>(
+    null
+  );
   const normalizedQuery = normalizeShopSearchQuery(query);
   const menuCategoryKey = useMemo(
     () => [...menuCategoryIds].sort().join(':'),
     [menuCategoryIds]
   );
+  const criteriaKey = `${normalizedQuery}:${menuCategoryKey}:${limit ?? ''}`;
 
   useEffect(() => {
     if (!normalizedQuery) {
       setShops([]);
       setLoading(false);
       setError(null);
+      setLoadedCriteriaKey(null);
       return;
     }
 
@@ -53,6 +59,7 @@ export function useShopSearch({
 
         if (!isCancelled) {
           setShops(data);
+          setLoadedCriteriaKey(criteriaKey);
         }
       } catch (err) {
         if (!isCancelled) {
@@ -62,6 +69,7 @@ export function useShopSearch({
               ? err.message
               : '가게 검색 결과를 불러올 수 없습니다.'
           );
+          setLoadedCriteriaKey(criteriaKey);
         }
       } finally {
         if (!isCancelled) {
@@ -75,11 +83,12 @@ export function useShopSearch({
     return () => {
       isCancelled = true;
     };
-  }, [limit, menuCategoryKey, normalizedQuery]);
+  }, [criteriaKey, limit, menuCategoryKey, normalizedQuery]);
 
   return {
     shops,
     loading,
     error,
+    isStale: normalizedQuery.length > 0 && loadedCriteriaKey !== criteriaKey,
   };
 }

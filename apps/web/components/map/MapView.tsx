@@ -12,10 +12,22 @@ import type { ShopMarkerInstance } from './ShopMarker';
 import { ShopInfoWindow } from './ShopInfoWindow';
 
 const SELECTED_SHOP_ZOOM_LEVEL = 4;
+const FOCUS_SHOPS_BOUNDS_PADDING = {
+  top: 96,
+  right: 96,
+  bottom: 152,
+  left: 32,
+};
 
 interface MapViewProps {
   center: Location;
   shops: Shop[];
+  focusBounds?: MapBounds | null;
+  focusBoundsKey?: string | null;
+  focusShops?: Shop[];
+  focusShopsKey?: string | null;
+  focusShop?: Shop | null;
+  focusShopKey?: string | null;
   onMarkerClick?: (shop: Shop) => void;
   onMapMove?: (newCenter: Location) => void; // 지도 이동 시 콜백
   onBoundsChange?: (bounds: MapBounds, center: Location) => void;
@@ -30,10 +42,18 @@ interface KakaoLatLng {
 interface KakaoLatLngBounds {
   getSouthWest: () => KakaoLatLng;
   getNorthEast: () => KakaoLatLng;
+  extend: (latlng: unknown) => void;
 }
 
 interface KakaoMapInstance {
   setCenter: (center: unknown) => void;
+  setBounds: (
+    bounds: KakaoLatLngBounds,
+    paddingTop?: number,
+    paddingRight?: number,
+    paddingBottom?: number,
+    paddingLeft?: number
+  ) => void;
   setLevel: (level: number) => void;
   getCenter: () => KakaoLatLng;
   getLevel: () => number;
@@ -55,6 +75,12 @@ interface KakaoMapInstance {
 export function MapView({
   center,
   shops,
+  focusBounds,
+  focusBoundsKey,
+  focusShops,
+  focusShopsKey,
+  focusShop,
+  focusShopKey,
   onMarkerClick,
   onMapMove,
   onBoundsChange,
@@ -64,6 +90,10 @@ export function MapView({
   const initialCenterRef = useRef(center);
   const initialZoomRef = useRef(zoom);
   const markersRef = useRef<ShopMarkerInstance[]>([]);
+  const lastFocusedBoundsKeyRef = useRef<string | null>(null);
+  const lastFocusedShopsKeyRef = useRef<string | null>(null);
+  const lastFocusedShopKeyRef = useRef<string | null>(null);
+  const autoSelectedShopIdRef = useRef<string | null>(null);
   const [map, setMap] = useState<KakaoMapInstance | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -124,8 +154,23 @@ export function MapView({
           }
         };
 
+        const closeSelectedShop = () => {
+          setSelectedShop(null);
+          autoSelectedShopIdRef.current = null;
+        };
+
         notifyMapPosition();
         kakao.maps.event.addListener(mapInstance, 'idle', notifyMapPosition);
+        kakao.maps.event.addListener(
+          mapInstance,
+          'dragstart',
+          closeSelectedShop
+        );
+        kakao.maps.event.addListener(
+          mapInstance,
+          'zoom_changed',
+          closeSelectedShop
+        );
 
         setMap(mapInstance);
         setIsLoading(false);
@@ -150,6 +195,105 @@ export function MapView({
     const newCenter = new kakao.maps.LatLng(center.lat, center.lng);
     map.setCenter(newCenter);
   }, [map, center]);
+
+  // 행정구역 등 명시된 영역을 한 화면에 표시
+  useEffect(() => {
+    if (!focusBoundsKey || !focusBounds) {
+      lastFocusedBoundsKeyRef.current = null;
+      return;
+    }
+
+    if (!map || !window.kakao) return;
+    if (lastFocusedBoundsKeyRef.current === focusBoundsKey) return;
+
+    const { kakao } = window;
+    const bounds = new kakao.maps.LatLngBounds() as KakaoLatLngBounds;
+
+    bounds.extend(
+      new kakao.maps.LatLng(focusBounds.minLat, focusBounds.minLng)
+    );
+    bounds.extend(
+      new kakao.maps.LatLng(focusBounds.maxLat, focusBounds.maxLng)
+    );
+
+    lastFocusedBoundsKeyRef.current = focusBoundsKey;
+    map.setBounds(
+      bounds,
+      FOCUS_SHOPS_BOUNDS_PADDING.top,
+      FOCUS_SHOPS_BOUNDS_PADDING.right,
+      FOCUS_SHOPS_BOUNDS_PADDING.bottom,
+      FOCUS_SHOPS_BOUNDS_PADDING.left
+    );
+  }, [focusBounds, focusBoundsKey, map]);
+
+  // 검색 결과 여러 개를 한 화면에 표시
+  useEffect(() => {
+    if (focusBoundsKey) {
+      lastFocusedShopsKeyRef.current = null;
+      return;
+    }
+
+    if (!focusShopsKey || !focusShops || focusShops.length < 2) {
+      lastFocusedShopsKeyRef.current = null;
+      return;
+    }
+
+    if (!map || !window.kakao) return;
+    if (lastFocusedShopsKeyRef.current === focusShopsKey) return;
+
+    const { kakao } = window;
+    const bounds = new kakao.maps.LatLngBounds() as KakaoLatLngBounds;
+
+    focusShops.forEach((shop) => {
+      bounds.extend(
+        new kakao.maps.LatLng(shop.location.lat, shop.location.lng)
+      );
+    });
+
+    lastFocusedShopsKeyRef.current = focusShopsKey;
+    map.setBounds(
+      bounds,
+      FOCUS_SHOPS_BOUNDS_PADDING.top,
+      FOCUS_SHOPS_BOUNDS_PADDING.right,
+      FOCUS_SHOPS_BOUNDS_PADDING.bottom,
+      FOCUS_SHOPS_BOUNDS_PADDING.left
+    );
+  }, [focusBoundsKey, focusShops, focusShopsKey, map]);
+
+  // 검색 결과가 하나일 때 해당 가게 상세보기를 표시
+  useEffect(() => {
+    if (focusBoundsKey) {
+      lastFocusedShopKeyRef.current = null;
+      const autoSelectedShopId = autoSelectedShopIdRef.current;
+      autoSelectedShopIdRef.current = null;
+      setSelectedShop((currentSelectedShop) =>
+        currentSelectedShop?.id === autoSelectedShopId
+          ? null
+          : currentSelectedShop
+      );
+      return;
+    }
+
+    if (!focusShopKey || !focusShop) {
+      lastFocusedShopKeyRef.current = null;
+      const autoSelectedShopId = autoSelectedShopIdRef.current;
+      autoSelectedShopIdRef.current = null;
+      setSelectedShop((currentSelectedShop) =>
+        currentSelectedShop?.id === autoSelectedShopId
+          ? null
+          : currentSelectedShop
+      );
+      return;
+    }
+
+    if (lastFocusedShopKeyRef.current === focusShopKey) {
+      return;
+    }
+
+    lastFocusedShopKeyRef.current = focusShopKey;
+    autoSelectedShopIdRef.current = focusShop.id;
+    setSelectedShop(focusShop);
+  }, [focusBoundsKey, focusShop, focusShopKey]);
 
   // 마커 렌더링
   useEffect(() => {
@@ -178,6 +322,7 @@ export function MapView({
           }
 
           map.setCenter(markerPosition);
+          autoSelectedShopIdRef.current = null;
           setSelectedShop(clickedShop);
           if (onMarkerClick) {
             onMarkerClick(clickedShop);
@@ -240,7 +385,6 @@ export function MapView({
           onClose={() => setSelectedShop(null)}
         />
       )}
-
     </div>
   );
 }

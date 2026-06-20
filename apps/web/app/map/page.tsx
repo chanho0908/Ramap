@@ -4,11 +4,12 @@
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapView } from '@/components/map/MapView';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useShopSearch } from '@/hooks/useShopSearch';
 import { useShopsByBounds } from '@/hooks/useShopsByBounds';
+import { findAdministrativeRegion } from '@/lib/administrative-regions';
 import {
   MENU_CATEGORIES,
   normalizeShopSearchQuery,
@@ -49,32 +50,52 @@ export default function MapPage() {
     useState(false);
   const [mapCenter, setMapCenter] = useState<Location>(DEFAULT_LOCATION);
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
+  const hasHandledInitialLocationRef = useRef(false);
+  const lastAutoCenteredShopKeyRef = useRef<string | null>(null);
+  const normalizedSearchQuery = normalizeShopSearchQuery(searchQuery);
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
+  const focusedAdministrativeRegion = useMemo(
+    () =>
+      hasSearchQuery ? findAdministrativeRegion(normalizedSearchQuery) : null,
+    [hasSearchQuery, normalizedSearchQuery]
+  );
+  const activeShopBounds = focusedAdministrativeRegion?.bounds ?? mapBounds;
   const {
     shops,
     loading: isLoadingShops,
     error: shopsError,
-  } = useShopsByBounds(mapBounds);
-  const normalizedSearchQuery = normalizeShopSearchQuery(searchQuery);
-  const hasSearchQuery = normalizedSearchQuery.length > 0;
+    isStale: areBoundsShopsStale,
+  } = useShopsByBounds(activeShopBounds);
+  const effectiveSearchQuery = focusedAdministrativeRegion ? '' : searchQuery;
+  const administrativeRegionFocusKey = focusedAdministrativeRegion
+    ? focusedAdministrativeRegion.canonicalName
+    : null;
   const {
     shops: globalSearchShops,
     loading: isLoadingGlobalSearch,
     error: globalSearchError,
+    isStale: isGlobalSearchStale,
   } = useShopSearch({
-    query: searchQuery,
+    query: effectiveSearchQuery,
     menuCategoryIds: selectedMenuCategoryIds,
     limit: 50,
   });
 
   // GPS 위치 변경 시 지도 중심 업데이트 (초기 한 번만)
   useEffect(() => {
-    if (location) {
+    if (!location || hasHandledInitialLocationRef.current) {
+      return;
+    }
+
+    if (!hasSearchQuery) {
+      hasHandledInitialLocationRef.current = true;
       setMapCenter(location);
     }
-  }, [location]);
+  }, [hasSearchQuery, location]);
 
   useEffect(() => {
     if (location && hasRequestedCurrentLocation) {
+      setMapCenter(location);
       setIsLocationPermissionDialogOpen(false);
       setHasRequestedCurrentLocation(false);
     }
@@ -93,14 +114,25 @@ export default function MapPage() {
 
   const searchResults = useMemo(
     () =>
-      searchShops(hasSearchQuery ? globalSearchShops : shops, {
-        query: hasSearchQuery ? searchQuery : '',
-        menuCategoryIds: selectedMenuCategoryIds,
-      }),
+      searchShops(
+        focusedAdministrativeRegion
+          ? areBoundsShopsStale
+            ? []
+            : shops
+          : hasSearchQuery
+            ? globalSearchShops
+            : shops,
+        {
+          query: hasSearchQuery ? effectiveSearchQuery : '',
+          menuCategoryIds: selectedMenuCategoryIds,
+        }
+      ),
     [
+      areBoundsShopsStale,
+      effectiveSearchQuery,
+      focusedAdministrativeRegion,
       globalSearchShops,
       hasSearchQuery,
-      searchQuery,
       selectedMenuCategoryIds,
       shops,
     ]
@@ -109,23 +141,152 @@ export default function MapPage() {
     () => searchResults.map((result) => result.shop),
     [searchResults]
   );
+  const searchFocusShopsKey = useMemo(() => {
+    if (
+      !hasSearchQuery ||
+      isLoadingGlobalSearch ||
+      isGlobalSearchStale ||
+      globalSearchError ||
+      focusedAdministrativeRegion ||
+      filteredShops.length <= 1
+    ) {
+      return null;
+    }
+
+    const filterKey = [...selectedMenuCategoryIds].sort().join(':');
+    const shopKey = filteredShops
+      .map((shop) => `${shop.id}:${shop.location.lat}:${shop.location.lng}`)
+      .join('|');
+
+    return `${normalizedSearchQuery}:${filterKey}:${shopKey}`;
+  }, [
+    filteredShops,
+    focusedAdministrativeRegion,
+    globalSearchError,
+    hasSearchQuery,
+    isGlobalSearchStale,
+    isLoadingGlobalSearch,
+    normalizedSearchQuery,
+    selectedMenuCategoryIds,
+  ]);
+  const singleSearchFocusShop = useMemo(() => {
+    if (
+      !hasSearchQuery ||
+      isLoadingGlobalSearch ||
+      isGlobalSearchStale ||
+      globalSearchError ||
+      focusedAdministrativeRegion ||
+      filteredShops.length !== 1
+    ) {
+      return null;
+    }
+
+    return filteredShops[0];
+  }, [
+    filteredShops,
+    focusedAdministrativeRegion,
+    globalSearchError,
+    hasSearchQuery,
+    isGlobalSearchStale,
+    isLoadingGlobalSearch,
+  ]);
+  const singleSearchFocusShopKey = useMemo(() => {
+    if (!singleSearchFocusShop) {
+      return null;
+    }
+
+    const filterKey = [...selectedMenuCategoryIds].sort().join(':');
+
+    return [
+      normalizedSearchQuery,
+      filterKey,
+      singleSearchFocusShop.id,
+      singleSearchFocusShop.location.lat,
+      singleSearchFocusShop.location.lng,
+    ].join(':');
+  }, [normalizedSearchQuery, selectedMenuCategoryIds, singleSearchFocusShop]);
 
   const hasSelectedFilters = selectedMenuCategoryIds.length > 0;
   const hasActiveRefinement = hasSearchQuery || hasSelectedFilters;
-  const visibleSourceShopCount = hasSearchQuery
+  const usesGlobalSearchResults =
+    hasSearchQuery && !focusedAdministrativeRegion;
+  const visibleSourceShopCount = usesGlobalSearchResults
     ? globalSearchShops.length
-    : shops.length;
-  const isLoadingVisibleShops = hasSearchQuery
+    : focusedAdministrativeRegion && areBoundsShopsStale
+      ? 0
+      : shops.length;
+  const isLoadingVisibleShops = usesGlobalSearchResults
     ? isLoadingGlobalSearch
-    : isLoadingShops;
-  const visibleShopsError = hasSearchQuery ? globalSearchError : shopsError;
-  const headerSummary = hasSearchQuery
-    ? `전체 검색 결과 ${filteredShops.length}곳${
-        hasSelectedFilters ? ` · 필터 ${selectedMenuCategoryIds.length}개` : ''
+    : isLoadingShops || (focusedAdministrativeRegion && areBoundsShopsStale);
+  const visibleShopsError = usesGlobalSearchResults
+    ? globalSearchError
+    : focusedAdministrativeRegion && areBoundsShopsStale
+      ? null
+      : shopsError;
+  const headerSummary = focusedAdministrativeRegion
+    ? `${focusedAdministrativeRegion.canonicalName} 라멘 가게 ${
+        filteredShops.length
+      }곳${
+        hasSelectedFilters
+          ? ` / 지역 ${visibleSourceShopCount}곳 · 필터 ${selectedMenuCategoryIds.length}개`
+          : ''
       }`
-    : hasActiveRefinement
-      ? `검색 결과 ${filteredShops.length}곳 / 주변 ${visibleSourceShopCount}곳`
-      : `주변 라멘 가게 ${visibleSourceShopCount}곳`;
+    : hasSearchQuery
+      ? `전체 검색 결과 ${filteredShops.length}곳${
+          hasSelectedFilters
+            ? ` · 필터 ${selectedMenuCategoryIds.length}개`
+            : ''
+        }`
+      : hasActiveRefinement
+        ? `검색 결과 ${filteredShops.length}곳 / 주변 ${visibleSourceShopCount}곳`
+        : `주변 라멘 가게 ${visibleSourceShopCount}곳`;
+
+  useEffect(() => {
+    if (!hasSearchQuery) {
+      lastAutoCenteredShopKeyRef.current = null;
+      return;
+    }
+
+    if (focusedAdministrativeRegion) {
+      lastAutoCenteredShopKeyRef.current = null;
+      return;
+    }
+
+    if (isLoadingGlobalSearch || isGlobalSearchStale || globalSearchError) {
+      return;
+    }
+
+    if (filteredShops.length !== 1) {
+      lastAutoCenteredShopKeyRef.current = null;
+      return;
+    }
+
+    const [shop] = filteredShops;
+    const filterKey = [...selectedMenuCategoryIds].sort().join(':');
+    const shopKey = [
+      normalizedSearchQuery,
+      filterKey,
+      shop.id,
+      shop.location.lat,
+      shop.location.lng,
+    ].join(':');
+
+    if (lastAutoCenteredShopKeyRef.current === shopKey) {
+      return;
+    }
+
+    lastAutoCenteredShopKeyRef.current = shopKey;
+    setMapCenter(shop.location);
+  }, [
+    filteredShops,
+    focusedAdministrativeRegion,
+    globalSearchError,
+    hasSearchQuery,
+    isGlobalSearchStale,
+    isLoadingGlobalSearch,
+    normalizedSearchQuery,
+    selectedMenuCategoryIds,
+  ]);
 
   const handleBoundsChange = useCallback(
     (bounds: MapBounds, center: Location) => {
@@ -181,10 +342,10 @@ export default function MapPage() {
                 <span className="inline-block animate-spin rounded-full h-3 w-3 border-b border-gray-600" />
                 위치 확인 중...
               </span>
-            ) : isLoadingGlobalSearch && hasSearchQuery ? (
+            ) : isLoadingVisibleShops ? (
               <span className="flex items-center gap-1">
                 <span className="inline-block animate-spin rounded-full h-3 w-3 border-b border-gray-600" />
-                전체 가게 검색 중...
+                가게 검색 중...
               </span>
             ) : (
               headerSummary
@@ -203,6 +364,16 @@ export default function MapPage() {
         <MapView
           center={mapCenter}
           shops={filteredShops}
+          focusBounds={focusedAdministrativeRegion?.bounds}
+          focusBoundsKey={administrativeRegionFocusKey}
+          focusShops={
+            !focusedAdministrativeRegion && searchFocusShopsKey
+              ? filteredShops
+              : undefined
+          }
+          focusShopsKey={searchFocusShopsKey}
+          focusShop={singleSearchFocusShop}
+          focusShopKey={singleSearchFocusShopKey}
           zoom={3}
           onBoundsChange={handleBoundsChange}
         />

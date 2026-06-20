@@ -33,7 +33,7 @@ Closes #<이슈번호>
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-**중요**: Subject와 Body는 **한국어**로 작성합니다.
+**중요**: Type과 Scope는 Conventional Commits 표기를 위해 영어를 허용하며, Subject와 Body는 **한국어**로 작성합니다.
 
 #### Type
 - `feat`: 새 기능

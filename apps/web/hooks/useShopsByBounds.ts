@@ -6,6 +6,7 @@ interface UseShopsByBoundsResult {
   shops: Shop[];
   loading: boolean;
   error: string | null;
+  isStale: boolean;
 }
 
 function floorCoordinate(value: number): number {
@@ -44,6 +45,7 @@ export function useShopsByBounds(
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadedBoundsKey, setLoadedBoundsKey] = useState<string | null>(null);
   const boundsKey = useMemo(() => getBoundsKey(bounds), [bounds]);
 
   useEffect(() => {
@@ -51,6 +53,7 @@ export function useShopsByBounds(
       setShops([]);
       setLoading(false);
       setError(null);
+      setLoadedBoundsKey(null);
       return;
     }
 
@@ -65,6 +68,7 @@ export function useShopsByBounds(
         const data = await fetchShopsByBounds(fetchBounds);
         if (!isCancelled) {
           setShops(data);
+          setLoadedBoundsKey(boundsKey);
         }
       } catch (err) {
         if (!isCancelled) {
@@ -74,6 +78,7 @@ export function useShopsByBounds(
               ? err.message
               : '가게 정보를 불러올 수 없습니다.'
           );
+          setLoadedBoundsKey(boundsKey);
         }
       } finally {
         if (!isCancelled) {
@@ -93,5 +98,6 @@ export function useShopsByBounds(
     shops,
     loading,
     error,
+    isStale: boundsKey !== null && loadedBoundsKey !== boundsKey,
   };
 }

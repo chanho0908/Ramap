@@ -324,7 +324,7 @@ EOF
 )"
 ```
 
-**중요**: Type과 Scope는 영어, Subject와 Body는 **한국어**로 작성합니다.
+**중요**: Type과 Scope는 Conventional Commits 표기를 위해 영어를 허용하며, Subject와 Body는 **한국어**로 작성합니다.
 
 **통합 실행**:
 명시적 통합 요청이 있으면 커밋 완료 후 별도 확인 없이 Step 8의 push 및 Draft PR 생성으로 이어집니다.
@@ -359,6 +359,9 @@ git log -1
 - 개별 PR 요청이 있으면 push 및 Draft PR 생성이 승인된 것으로 봅니다.
 - 통합 실행 요청이 있으면 `committer` 이후 `pr-creator`까지 연속 실행하도록 승인된 것으로 봅니다.
 - PR은 항상 Draft PR로 생성합니다.
+- PR 제목과 본문은 **한국어**로 작성합니다. Type과 Scope는 Conventional Commits 표기를 위해 영어를 허용합니다.
+- PR 본문에는 `## Verification` 섹션을 작성하지 않습니다.
+- PR 본문에는 `pnpm --filter web type-check`, `pnpm --filter web lint`, `pnpm type-check` 같은 검증 명령어 체크리스트를 작성하지 않습니다.
 - PR 병합은 자동 실행하지 않으며 사람이 최종 리뷰 후 병합합니다.
 
 **실행**:
@@ -370,7 +373,7 @@ git push -u origin feature/42-add-shop-markers
 gh pr create \
   --base develop \
   --head feature/42-add-shop-markers \
-  --title "feat(map): add shop markers on map" \
+  --title "feat(map): 지도에 라멘집 마커 표시" \
   --body "$(cat <<'EOF'
 ## 변경 사항
 - Kakao Map SDK 통합
