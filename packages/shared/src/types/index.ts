@@ -44,6 +44,32 @@ export interface ShopRow {
   updated_at: string;
 }
 
+export type WaitingProvider =
+  | 'catchtable'
+  | 'tabling'
+  | 'syrup_friends'
+  | 'unknown';
+
+export interface ShopWaitingSystem {
+  id: string;
+  shopId: string;
+  provider: WaitingProvider;
+  providerUrl?: string;
+}
+
+export interface ShopWaitingSystemRow {
+  id: string;
+  shop_id: string;
+  provider: WaitingProvider;
+  provider_url: string | null;
+}
+
+export interface UpsertShopWaitingSystemParams {
+  shopId: string;
+  provider: WaitingProvider;
+  providerUrl?: string;
+}
+
 // Review types
 export interface Review {
   id: string;

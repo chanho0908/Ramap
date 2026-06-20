@@ -8,6 +8,9 @@ declare global {
   }
 }
 
+const KAKAO_MAP_SDK_ID = 'kakao-map-sdk';
+let kakaoMapsLoadPromise: Promise<void> | null = null;
+
 /**
  * Kakao Maps SDK가 로드되었는지 확인
  * LatLng 클래스가 실제로 사용 가능한지까지 확인
@@ -26,7 +29,25 @@ export function isKakaoMapsLoaded(): boolean {
  * @returns Promise<void> SDK 로드 완료 시 resolve
  */
 export function loadKakaoMaps(): Promise<void> {
-  return new Promise((resolve, reject) => {
+  if (kakaoMapsLoadPromise) {
+    return kakaoMapsLoadPromise;
+  }
+
+  kakaoMapsLoadPromise = new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      reject(new Error('Kakao Maps SDK는 브라우저에서만 로드할 수 있습니다.'));
+      return;
+    }
+
+    if (!hasKakaoMapKey()) {
+      reject(
+        new Error(
+          'NEXT_PUBLIC_KAKAO_MAP_KEY가 설정되지 않았습니다. Kakao JavaScript 키를 확인하세요.'
+        )
+      );
+      return;
+    }
+
     // 이미 로드되어 있으면 즉시 resolve
     if (isKakaoMapsLoaded()) {
       console.log('[Kakao Maps] Already loaded');
@@ -49,11 +70,33 @@ export function loadKakaoMaps(): Promise<void> {
       return;
     }
 
-    // SDK 스크립트가 아직 로드되지 않은 경우 - 재시도
-    console.log('[Kakao Maps] SDK not found, waiting...');
+    const existingScript = document.getElementById(
+      KAKAO_MAP_SDK_ID
+    ) as HTMLScriptElement | null;
+    const script =
+      existingScript ??
+      Object.assign(document.createElement('script'), {
+        id: KAKAO_MAP_SDK_ID,
+        src: `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&autoload=false`,
+        async: true,
+      });
+
+    if (!existingScript) {
+      document.head.appendChild(script);
+    }
+
+    script.onerror = () => {
+      console.error('[Kakao Maps] SDK script failed to load');
+      kakaoMapsLoadPromise = null;
+      reject(
+        new Error(
+          'Kakao Maps SDK 스크립트를 불러오지 못했습니다. API 키와 도메인 등록을 확인하세요.'
+        )
+      );
+    };
 
     let retries = 0;
-    const maxRetries = 20; // 최대 10초 대기
+    const maxRetries = 40; // 최대 20초 대기
 
     const checkInterval = setInterval(() => {
       retries++;
@@ -74,10 +117,17 @@ export function loadKakaoMaps(): Promise<void> {
       } else if (retries >= maxRetries) {
         clearInterval(checkInterval);
         console.error('[Kakao Maps] SDK load timeout');
-        reject(new Error('Kakao Maps SDK 로드 시간 초과. API 키를 확인하세요.'));
+        kakaoMapsLoadPromise = null;
+        reject(
+          new Error(
+            'Kakao Maps SDK 로드 시간 초과. API 키와 Kakao Developers 도메인 등록을 확인하세요.'
+          )
+        );
       }
     }, 500);
   });
+
+  return kakaoMapsLoadPromise;
 }
 
 /**
@@ -85,7 +135,7 @@ export function loadKakaoMaps(): Promise<void> {
  */
 export function hasKakaoMapKey(): boolean {
   const key = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
-  return Boolean(key && key !== 'your-kakao-map-key');
+  return Boolean(key && key !== 'your-kakao-map-key' && !key.includes('your-'));
 }
 
 /**

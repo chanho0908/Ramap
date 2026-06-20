@@ -2,12 +2,54 @@
  * 가게 정보창 컴포넌트
  */
 
-import { getMenuCategoryLabel } from '@ramap/shared';
-import type { Shop } from '@ramap/shared';
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import { fetchShopWaitingSystem, getMenuCategoryLabel } from '@ramap/shared';
+import type { Shop, ShopWaitingSystem, WaitingProvider } from '@ramap/shared';
 
 interface ShopInfoWindowProps {
   shop: Shop;
   onClose: () => void;
+}
+
+interface WaitingProviderDisplay {
+  label: string;
+  iconSrc: string;
+}
+
+const WAITING_PROVIDER_DISPLAY: Partial<
+  Record<WaitingProvider, WaitingProviderDisplay>
+> = {
+  catchtable: {
+    label: '캐치테이블',
+    iconSrc: '/waiting-providers/catchtable.png',
+  },
+  tabling: {
+    label: '테이블링',
+    iconSrc: '/waiting-providers/tabling.png',
+  },
+  syrup_friends: {
+    label: '시럽 프렌즈',
+    iconSrc: '/waiting-providers/syrup-friends.png',
+  },
+};
+
+function getWaitingProviderLink(
+  waitingSystem: ShopWaitingSystem | null
+): (WaitingProviderDisplay & { providerUrl: string }) | null {
+  if (!waitingSystem?.providerUrl) {
+    return null;
+  }
+
+  const providerDisplay = WAITING_PROVIDER_DISPLAY[waitingSystem.provider];
+  if (!providerDisplay) {
+    return null;
+  }
+
+  return {
+    ...providerDisplay,
+    providerUrl: waitingSystem.providerUrl,
+  };
 }
 
 /**
@@ -28,6 +70,31 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
     id: categoryId,
     label: getMenuCategoryLabel(categoryId),
   }));
+  const [waitingSystem, setWaitingSystem] = useState<ShopWaitingSystem | null>(
+    null
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setWaitingSystem(null);
+
+    async function loadWaitingSystem() {
+      const data = await fetchShopWaitingSystem(shop.id);
+
+      if (isMounted) {
+        setWaitingSystem(data);
+      }
+    }
+
+    loadWaitingSystem();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [shop.id]);
+
+  const waitingProviderLink = getWaitingProviderLink(waitingSystem);
 
   return (
     <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl p-5 w-11/12 max-w-md z-30 animate-fade-in border border-gray-100">
@@ -107,11 +174,12 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
           )}
           {shop.instagramUrl && (
             <p className="text-sm flex items-center gap-2">
-              <img
+              <Image
                 src="/instagram-icon.png"
                 alt=""
-                aria-hidden="true"
-                className="w-4 h-4"
+                width={16}
+                height={16}
+                className="h-4 w-4"
               />
               <a
                 href={shop.instagramUrl}
@@ -120,6 +188,27 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
                 className="text-purple-600 hover:text-purple-800 hover:underline font-medium"
               >
                 Instagram
+              </a>
+            </p>
+          )}
+          {waitingProviderLink && (
+            <p className="text-sm flex items-center gap-2">
+              <span className="text-gray-400">대기</span>
+              <a
+                href={waitingProviderLink.providerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm transition-colors hover:border-red-300 hover:bg-red-50"
+                aria-label={`${waitingProviderLink.label} 웨이팅 페이지 열기`}
+                title={`${waitingProviderLink.label} 웨이팅`}
+              >
+                <Image
+                  src={waitingProviderLink.iconSrc}
+                  alt=""
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 object-contain"
+                />
               </a>
             </p>
           )}
@@ -134,11 +223,12 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline font-medium"
             >
-              <img
+              <Image
                 src="/kakao-map-icon.png"
                 alt=""
-                aria-hidden="true"
-                className="w-4 h-4 rounded-sm"
+                width={16}
+                height={16}
+                className="h-4 w-4 rounded-sm"
               />
               카카오맵에서 보기
             </a>
