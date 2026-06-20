@@ -11,6 +11,7 @@ export * from './utils/shop-search';
 
 // Export mappers
 export * from './mappers/shop';
+export * from './mappers/waiting-system';
 
 // Export constants
 export * from './constants/marker';

@@ -3,8 +3,17 @@
  */
 
 import { supabase } from './supabase';
-import type { Shop, Location, MapBounds, ShopRow } from '../types';
+import type {
+  Location,
+  MapBounds,
+  Shop,
+  ShopRow,
+  ShopWaitingSystem,
+  ShopWaitingSystemRow,
+  UpsertShopWaitingSystemParams,
+} from '../types';
 import { mapShopRowToShop } from '../mappers/shop';
+import { mapShopWaitingSystemRowToShopWaitingSystem } from '../mappers/waiting-system';
 import { getBoundingBox } from '../utils/location';
 import { normalizeShopSearchQuery } from '../utils/shop-search';
 import { MENU_CATEGORIES } from '../constants/menu-categories';
@@ -253,4 +262,105 @@ export async function fetchShopById(id: string): Promise<Shop | null> {
     console.error('[fetchShopById Error]', error);
     return null;
   }
+}
+
+/**
+ * Shop별 웨이팅 시스템 조회
+ *
+ * @param shopId Shop ID
+ * @returns Shop 웨이팅 시스템 정보 또는 null
+ */
+export async function fetchShopWaitingSystem(
+  shopId: string
+): Promise<ShopWaitingSystem | null> {
+  try {
+    const { data, error } = await supabase
+      .from('shop_waiting_systems')
+      .select('*')
+      .eq('shop_id', shopId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[fetchShopWaitingSystem Error]', error);
+      return null;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return mapShopWaitingSystemRowToShopWaitingSystem(
+      data as ShopWaitingSystemRow
+    );
+  } catch (error) {
+    console.error('[fetchShopWaitingSystem Error]', error);
+    return null;
+  }
+}
+
+/**
+ * 여러 Shop의 웨이팅 시스템 조회
+ *
+ * @param shopIds Shop ID 목록
+ * @returns Shop 웨이팅 시스템 정보 목록
+ */
+export async function fetchShopWaitingSystems(
+  shopIds: string[]
+): Promise<ShopWaitingSystem[]> {
+  if (shopIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('shop_waiting_systems')
+      .select('*')
+      .in('shop_id', shopIds);
+
+    if (error) {
+      console.error('[fetchShopWaitingSystems Error]', error);
+      throw new Error(
+        `웨이팅 시스템 데이터를 가져올 수 없습니다: ${error.message}`
+      );
+    }
+
+    return ((data || []) as ShopWaitingSystemRow[]).map(
+      mapShopWaitingSystemRowToShopWaitingSystem
+    );
+  } catch (error) {
+    console.error('[fetchShopWaitingSystems Error]', error);
+    throw error;
+  }
+}
+
+/**
+ * Shop 웨이팅 시스템 식별 결과 저장
+ *
+ * 실시간 대기 데이터가 아니라 provider 메타데이터만 저장합니다.
+ */
+export async function upsertShopWaitingSystem(
+  params: UpsertShopWaitingSystemParams
+): Promise<ShopWaitingSystem> {
+  const payload = {
+    shop_id: params.shopId,
+    provider: params.provider,
+    provider_url: params.providerUrl ?? null,
+  };
+
+  const { data, error } = await supabase
+    .from('shop_waiting_systems')
+    .upsert(payload, { onConflict: 'shop_id' })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[upsertShopWaitingSystem Error]', error);
+    throw new Error(
+      `웨이팅 시스템 데이터를 저장할 수 없습니다: ${error.message}`
+    );
+  }
+
+  return mapShopWaitingSystemRowToShopWaitingSystem(
+    data as ShopWaitingSystemRow
+  );
 }
