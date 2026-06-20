@@ -132,6 +132,142 @@ reports/crawling/instagram-<timestamp>/
 └── summary.json
 ```
 
+### 웨이팅 시스템 식별
+
+```bash
+pnpm crawl:waiting-systems
+```
+
+각 Shop의 Kakao Place 상세 페이지에서 외부 링크만 확인해 `catchtable`, `tabling`, `syrup_friends`, `unknown` 중 어떤 웨이팅 시스템을 사용하는지 식별합니다. 이 스크립트는 실시간 대기 인원, 순번, 예상 시간 같은 대기 상태 데이터는 수집하거나 저장하지 않습니다.
+
+기본 실행은 항상 dry-run입니다. DB에 저장하려면 `--confirm-live`를 명시해야 합니다:
+
+```bash
+pnpm crawl:waiting-systems -- --confirm-live --limit 50
+```
+
+주요 옵션:
+
+| 옵션                  | 설명                                           | 기본값             |
+| --------------------- | ---------------------------------------------- | ------------------ |
+| `--confirm-live`      | `shop_waiting_systems` 테이블에 식별 결과 저장 | `false`            |
+| `--dry-run`           | DB 업데이트 없이 식별과 리포트 생성만 수행     | `true`             |
+| `--limit <number>`    | 처리할 Shop 최대 개수                          | 전체               |
+| `--delay-ms <number>` | Kakao 상세 페이지 요청 간 지연                 | `1500`             |
+| `--missing-only`      | 식별 결과가 없는 Shop만 처리                   | `false`            |
+| `--headful`           | Puppeteer 브라우저를 화면에 표시               | `false`            |
+| `--report-dir <path>` | 리포트 저장 경로                               | `reports/crawling` |
+
+실행 후 식별 결과는 다음 위치에 저장됩니다:
+
+```text
+reports/crawling/waiting-systems-<timestamp>/
+├── shop-waiting-systems.json
+├── shop-waiting-systems.csv
+└── summary.json
+```
+
+### Catchtable 검색 결과 링크 가져오기
+
+Catchtable 검색 화면에서 브라우저 콘솔로 추출한 JSON 파일을 Ramap DB의 `shops`와 매칭한 뒤, 신뢰도 높은 단일 후보만 `shop_waiting_systems`에 `provider='catchtable'`로 반영합니다. 애매하거나 기준 미달인 항목은 DB에 쓰지 않고 검토 리포트로 분리합니다.
+
+기본 입력 파일은 `data/catchtable-shops.json`이며, 기본 실행은 항상 dry-run입니다:
+
+```bash
+pnpm import:catchtable-links
+```
+
+DB에 실제 반영하려면 `--confirm-live`를 명시합니다:
+
+```bash
+pnpm import:catchtable-links -- --confirm-live
+```
+
+주요 옵션:
+
+| 옵션                     | 설명                                                  | 기본값                       |
+| ------------------------ | ----------------------------------------------------- | ---------------------------- |
+| `--input <path>`         | Catchtable 추출 JSON 파일 경로                        | `data/catchtable-shops.json` |
+| `--confirm-live`         | 자동 매칭 결과를 `shop_waiting_systems` 테이블에 저장 | `false`                      |
+| `--dry-run`              | DB 업데이트 없이 매칭과 리포트 생성만 수행            | `true`                       |
+| `--min-confidence <0-1>` | 자동 매칭 최소 신뢰도                                 | `0.85`                       |
+| `--report-dir <path>`    | 리포트 저장 경로                                      | `reports/crawling`           |
+
+입력 JSON은 배열과 `{ "shops": [...] }` 형태를 모두 지원합니다:
+
+```json
+[
+  {
+    "name": "멘야산다이메",
+    "url": "https://app.catchtable.co.kr/ct/shop/example",
+    "address": "서울 ..."
+  }
+]
+```
+
+```json
+{
+  "shops": [
+    {
+      "name": "멘야산다이메",
+      "url": "https://app.catchtable.co.kr/ct/shop/example"
+    }
+  ]
+}
+```
+
+브라우저 콘솔 추출 스니펫:
+
+```javascript
+(() => {
+  const normalizeText = (value) => value?.replace(/\s+/g, ' ').trim();
+  const anchors = [...document.querySelectorAll('a[href]')];
+  const shops = anchors
+    .map((anchor) => {
+      const url = new URL(anchor.getAttribute('href'), location.origin).href;
+      if (!/catchtable\.co\.kr\/(ct\/)?shop\//.test(url)) {
+        return null;
+      }
+
+      const container =
+        anchor.closest('li, article, section, div') || anchor.parentElement;
+      const text = normalizeText(container?.innerText || anchor.innerText);
+      const lines = text?.split('\n').map(normalizeText).filter(Boolean) || [];
+      const name = normalizeText(anchor.innerText) || lines[0];
+      const address = lines.find((line) =>
+        /[가-힣]+(로|길|동|구|시)/.test(line)
+      );
+
+      if (!name) {
+        return null;
+      }
+
+      return { name, url, address };
+    })
+    .filter(Boolean);
+
+  const uniqueShops = [
+    ...new Map(shops.map((shop) => [shop.url, shop])).values(),
+  ];
+  copy(JSON.stringify(uniqueShops, null, 2));
+  console.table(uniqueShops);
+  return uniqueShops;
+})();
+```
+
+실행 후 리포트는 다음 위치에 저장됩니다:
+
+```text
+reports/crawling/catchtable-import-<timestamp>/
+├── matched.json
+├── matched.csv
+├── needs-review.json
+├── needs-review.csv
+├── unmatched.json
+├── unmatched.csv
+└── summary.json
+```
+
 ### 실행 결과 예시
 
 ```
