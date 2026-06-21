@@ -23,6 +23,7 @@ export interface Shop {
   instagramUrl?: string;
   kakaoRating?: number;
   menuCategoryIds: string[];
+  isVisible: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,6 +41,7 @@ export interface ShopRow {
   instagram_url: string | null;
   kakao_rating: number | null;
   menu_category_ids: string[] | null;
+  is_visible: boolean | null;
   created_at: string;
   updated_at: string;
 }

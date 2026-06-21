@@ -50,6 +50,7 @@ Thumbs.db
 # Supabase
 supabase/.temp/
 supabase/.branches/
+supabase/migrations/*.sql
 
 # Build outputs
 *.tsbuildinfo
