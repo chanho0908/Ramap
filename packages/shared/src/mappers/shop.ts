@@ -20,6 +20,7 @@ export function mapShopRowToShop(row: ShopRow): Shop {
     instagramUrl: optional(row.instagram_url),
     kakaoRating: optional(row.kakao_rating),
     menuCategoryIds: row.menu_category_ids ?? [],
+    isVisible: row.is_visible ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

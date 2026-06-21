@@ -25,6 +25,7 @@ export interface FetchShopsBySearchCriteria {
 }
 
 const DEFAULT_SEARCH_LIMIT = 50;
+const VISIBLE_SHOP_FILTER = { column: 'is_visible', value: true } as const;
 const SHOP_TEXT_SEARCH_COLUMNS = [
   'name',
   'address',
@@ -66,6 +67,7 @@ async function fetchShopRowsByTextColumn(
   let request = supabase
     .from('shops')
     .select('*')
+    .eq(VISIBLE_SHOP_FILTER.column, VISIBLE_SHOP_FILTER.value)
     .ilike(column, pattern)
     .limit(limit);
 
@@ -91,6 +93,7 @@ async function fetchShopsInBounds(
     const { data, error } = await supabase
       .from('shops')
       .select('*')
+      .eq(VISIBLE_SHOP_FILTER.column, VISIBLE_SHOP_FILTER.value)
       .gte('lat', bounds.minLat)
       .lte('lat', bounds.maxLat)
       .gte('lng', bounds.minLng)
@@ -191,6 +194,7 @@ export async function fetchShopsBySearch(
       let menuSearchRequest = supabase
         .from('shops')
         .select('*')
+        .eq(VISIBLE_SHOP_FILTER.column, VISIBLE_SHOP_FILTER.value)
         .overlaps('menu_category_ids', matchedMenuCategoryIds)
         .limit(limit);
 
