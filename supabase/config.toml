@@ -45,7 +45,7 @@ file_size_limit = "50MB"
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:19006"]
+additional_redirect_urls = ["http://localhost:3000/auth/callback", "http://localhost:19006"]
 jwt_expiry = 3600
 enable_signup = true
 enable_anonymous_sign_ins = true

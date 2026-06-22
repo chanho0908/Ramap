@@ -5,6 +5,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MapAuthButton } from '@/components/auth/MapAuthButton';
 import { MapView } from '@/components/map/MapView';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useShopSearch } from '@/hooks/useShopSearch';
@@ -466,7 +467,7 @@ export default function MapPage() {
         <button
           type="button"
           onClick={handleMoveToCurrentLocation}
-          className="absolute bottom-36 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl font-semibold text-gray-800 shadow-xl ring-2 ring-white transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-70"
+          className="absolute bottom-20 left-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl font-semibold text-gray-800 shadow-xl ring-2 ring-white transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-70"
           aria-label="현재 위치로 이동"
           title="현재 위치로 이동"
           disabled={geoLoading && hasRequestedCurrentLocation}
@@ -477,6 +478,8 @@ export default function MapPage() {
             '⌖'
           )}
         </button>
+
+        <MapAuthButton />
 
         {isLocationPermissionDialogOpen && (
           <div
