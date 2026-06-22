@@ -28,11 +28,15 @@ const getSupabaseClient = (): SupabaseClient => {
 
   if (!config) {
     throw new Error(
-      'Supabase environment variables are required before calling the Supabase API. Set NEXT_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY or EXPO_PUBLIC_SUPABASE_ANON_KEY.',
+      'Supabase environment variables are required before calling the Supabase API. Set NEXT_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY or EXPO_PUBLIC_SUPABASE_ANON_KEY.'
     );
   }
 
-  supabaseClient = createClient(config.supabaseUrl, config.supabaseAnonKey);
+  supabaseClient = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      flowType: 'implicit',
+    },
+  });
 
   return supabaseClient;
 };
