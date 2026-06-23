@@ -5,6 +5,7 @@ export * from './types';
 export * from './api/supabase';
 export * from './api/shops';
 export * from './api/auth';
+export * from './api/personalization';
 
 // Export utils
 export * from './utils/location';

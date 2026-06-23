@@ -46,6 +46,23 @@ export interface ShopRow {
   updated_at: string;
 }
 
+export interface UserShopBookmarkRow {
+  user_id: string;
+  shop_id: string;
+  created_at: string;
+}
+
+export interface UserHiddenShopRow {
+  user_id: string;
+  shop_id: string;
+  created_at: string;
+}
+
+export interface UserShopPersonalization {
+  bookmarkedShopIds: string[];
+  hiddenShopIds: string[];
+}
+
 export type WaitingProvider =
   | 'catchtable'
   | 'tabling'

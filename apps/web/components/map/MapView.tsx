@@ -22,6 +22,9 @@ const FOCUS_SHOPS_BOUNDS_PADDING = {
 interface MapViewProps {
   center: Location;
   shops: Shop[];
+  bookmarkedShopIds?: Set<string>;
+  hiddenShopIds?: Set<string>;
+  isPersonalizationSubmitting?: boolean;
   focusBounds?: MapBounds | null;
   focusBoundsKey?: string | null;
   focusShops?: Shop[];
@@ -29,6 +32,8 @@ interface MapViewProps {
   focusShop?: Shop | null;
   focusShopKey?: string | null;
   onMarkerClick?: (shop: Shop) => void;
+  onToggleBookmark?: (shop: Shop) => void;
+  onToggleHidden?: (shop: Shop) => void;
   onMapMove?: (newCenter: Location) => void; // 지도 이동 시 콜백
   onBoundsChange?: (bounds: MapBounds, center: Location) => void;
   zoom?: number; // Kakao Maps level (작을수록 확대, 기본 3)
@@ -75,6 +80,9 @@ interface KakaoMapInstance {
 export function MapView({
   center,
   shops,
+  bookmarkedShopIds = new Set<string>(),
+  hiddenShopIds = new Set<string>(),
+  isPersonalizationSubmitting = false,
   focusBounds,
   focusBoundsKey,
   focusShops,
@@ -82,6 +90,8 @@ export function MapView({
   focusShop,
   focusShopKey,
   onMarkerClick,
+  onToggleBookmark,
+  onToggleHidden,
   onMapMove,
   onBoundsChange,
   zoom = 3, // 기본값: level 3 (확대된 상태)
@@ -344,6 +354,16 @@ export function MapView({
     };
   }, [map, shops, selectedShop?.id, onMarkerClick]);
 
+  useEffect(() => {
+    if (!selectedShop) {
+      return;
+    }
+
+    if (!shops.some((shop) => shop.id === selectedShop.id)) {
+      setSelectedShop(null);
+    }
+  }, [selectedShop, shops]);
+
   return (
     <div className="relative w-full h-full">
       {/* 지도 컨테이너 - 항상 렌더링 */}
@@ -382,7 +402,12 @@ export function MapView({
       {selectedShop && !isLoading && !error && (
         <ShopInfoWindow
           shop={selectedShop}
+          isBookmarked={bookmarkedShopIds.has(selectedShop.id)}
+          isHidden={hiddenShopIds.has(selectedShop.id)}
+          isPersonalizationSubmitting={isPersonalizationSubmitting}
           onClose={() => setSelectedShop(null)}
+          onToggleBookmark={onToggleBookmark ?? (() => undefined)}
+          onToggleHidden={onToggleHidden ?? (() => undefined)}
         />
       )}
     </div>

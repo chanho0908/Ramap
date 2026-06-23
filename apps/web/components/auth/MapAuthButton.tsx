@@ -1,16 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
-import {
-  getCurrentUser,
-  onAuthStateChange,
-  signInWithKakao,
-  signOut,
-} from '@ramap/shared';
+
+export type PersonalizationView = 'all' | 'bookmarked' | 'hidden';
 
 interface MapAuthButtonProps {
-  redirectPath?: string;
+  user: User | null;
+  isLoading: boolean;
+  isSubmitting: boolean;
+  activeView: PersonalizationView;
+  onLogin: () => Promise<void>;
+  onLogout: () => Promise<void>;
+  onShowHiddenShops: () => void;
+  onRequestAccountDeletion: () => void;
 }
 
 function KakaoTalkIcon() {
@@ -34,94 +38,133 @@ function KakaoTalkIcon() {
   );
 }
 
-export function MapAuthButton({ redirectPath = '/map' }: MapAuthButtonProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+function SettingsIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-7 w-7"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    >
+      <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
+      <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.06.06a2.1 2.1 0 0 1-2.97 2.97l-.06-.06a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.65v.17a2.1 2.1 0 0 1-4.2 0v-.09a1.8 1.8 0 0 0-1.18-1.65 1.8 1.8 0 0 0-1.98.36l-.06.06a2.1 2.1 0 0 1-2.97-2.97l.06-.06a1.8 1.8 0 0 0 .36-1.98 1.8 1.8 0 0 0-1.65-1.1H1.9a2.1 2.1 0 0 1 0-4.2h.09a1.8 1.8 0 0 0 1.65-1.18 1.8 1.8 0 0 0-.36-1.98l-.06-.06A2.1 2.1 0 0 1 6.19 3.7l.06.06a1.8 1.8 0 0 0 1.98.36H8.3A1.8 1.8 0 0 0 9.4 2.47V2.3a2.1 2.1 0 0 1 4.2 0v.09a1.8 1.8 0 0 0 1.1 1.65 1.8 1.8 0 0 0 1.98-.36l.06-.06a2.1 2.1 0 1 1 2.97 2.97l-.06.06a1.8 1.8 0 0 0-.36 1.98v.07a1.8 1.8 0 0 0 1.65 1.1h.17a2.1 2.1 0 0 1 0 4.2h-.09A1.8 1.8 0 0 0 19.4 15Z" />
+    </svg>
+  );
+}
 
-  const redirectTo = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return undefined;
-    }
+interface MenuButtonProps {
+  children: ReactNode;
+  onClick: () => void;
+  isActive?: boolean;
+  isDanger?: boolean;
+}
 
-    const callbackUrl = new URL('/auth/callback', window.location.origin);
-    callbackUrl.searchParams.set('next', redirectPath);
-
-    return callbackUrl.toString();
-  }, [redirectPath]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    getCurrentUser()
-      .then((currentUser) => {
-        if (isMounted) {
-          setUser(currentUser);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setUser(null);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      });
-
-    const unsubscribe = onAuthStateChange(({ session }) => {
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, []);
-
-  const handleClick = async () => {
-    setIsSubmitting(true);
-
-    try {
-      if (user) {
-        await signOut();
-        setUser(null);
-        return;
-      }
-
-      await signInWithKakao({ redirectTo });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const isDisabled = isLoading || isSubmitting;
-  const label = user ? '로그아웃' : '카카오 로그인';
-
+function MenuButton({
+  children,
+  onClick,
+  isActive = false,
+  isDanger = false,
+}: MenuButtonProps) {
   return (
     <button
       type="button"
-      onClick={handleClick}
-      disabled={isDisabled}
-      className={`absolute bottom-36 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full text-sm font-bold shadow-xl ring-2 ring-white transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
-        user
-          ? 'bg-gray-900 text-white hover:bg-gray-700'
-          : 'bg-[#FEE500] text-[#191919] hover:bg-[#F4D800]'
+      onClick={onClick}
+      className={`ds-menu-item ${isActive ? 'ds-menu-item-active' : ''} ${
+        isDanger ? 'text-gray-950' : ''
       }`}
-      aria-label={label}
-      title={label}
     >
-      {isDisabled ? (
-        <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-b-transparent" />
-      ) : user ? (
-        <span aria-hidden="true" className="text-lg leading-none">
-          ⎋
-        </span>
-      ) : (
-        <KakaoTalkIcon />
-      )}
+      {children}
     </button>
+  );
+}
+
+export function MapAuthButton({
+  user,
+  isLoading,
+  isSubmitting,
+  activeView,
+  onLogin,
+  onLogout,
+  onShowHiddenShops,
+  onRequestAccountDeletion,
+}: MapAuthButtonProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isDisabled = isLoading || isSubmitting;
+  const label = user ? '설정' : '카카오 로그인';
+  const menuTitle = useMemo(() => user?.email ?? '로그인한 사용자', [user]);
+
+  const runMenuAction = (action: () => void) => {
+    action();
+    setIsMenuOpen(false);
+  };
+
+  const handleMainClick = async () => {
+    if (isDisabled) {
+      return;
+    }
+
+    if (!user) {
+      await onLogin();
+      return;
+    }
+
+    setIsMenuOpen((current) => !current);
+  };
+
+  const handleLogout = async () => {
+    setIsMenuOpen(false);
+    await onLogout();
+  };
+
+  return (
+    <div className="absolute bottom-36 right-4 z-30">
+      {user && isMenuOpen && (
+        <div className="ds-panel absolute bottom-16 right-0 w-56 p-2">
+          <div className="mb-1 truncate px-3 py-2 text-xs font-medium uppercase tracking-[0.05em] text-gray-500">
+            {menuTitle}
+          </div>
+          <MenuButton
+            onClick={() => runMenuAction(onShowHiddenShops)}
+            isActive={activeView === 'hidden'}
+          >
+            숨긴 매장 보기
+          </MenuButton>
+          <div className="my-1 h-px bg-gray-100" />
+          <MenuButton onClick={handleLogout}>로그아웃</MenuButton>
+          <MenuButton
+            onClick={() => runMenuAction(onRequestAccountDeletion)}
+            isDanger
+          >
+            계정 삭제
+          </MenuButton>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={handleMainClick}
+        disabled={isDisabled}
+        className={`ds-icon-button h-14 w-14 text-sm font-bold shadow-[var(--ds-shadow-soft)] ring-2 ring-white disabled:cursor-not-allowed disabled:opacity-70 ${
+          user
+            ? 'ds-icon-button-active'
+            : 'bg-[#FEE500] text-[#191919] hover:bg-[#FEE500]'
+        }`}
+        aria-label={label}
+        aria-expanded={user ? isMenuOpen : undefined}
+        title={label}
+      >
+        {isDisabled ? (
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-b-transparent" />
+        ) : user ? (
+          <SettingsIcon />
+        ) : (
+          <KakaoTalkIcon />
+        )}
+      </button>
+    </div>
   );
 }
