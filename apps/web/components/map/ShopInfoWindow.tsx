@@ -9,7 +9,12 @@ import type { Shop, ShopWaitingSystem, WaitingProvider } from '@ramap/shared';
 
 interface ShopInfoWindowProps {
   shop: Shop;
+  isBookmarked: boolean;
+  isHidden: boolean;
+  isPersonalizationSubmitting: boolean;
   onClose: () => void;
+  onToggleBookmark: (shop: Shop) => void;
+  onToggleHidden: (shop: Shop) => void;
 }
 
 interface WaitingProviderDisplay {
@@ -52,6 +57,43 @@ function getWaitingProviderLink(
   };
 }
 
+function BookmarkIcon({ isActive }: { isActive: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      viewBox="0 0 24 24"
+      fill={isActive ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    >
+      <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" />
+    </svg>
+  );
+}
+
+function HiddenIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+    >
+      <path d="M10.7 5.1A10.4 10.4 0 0 1 12 5c5 0 8.6 4.4 10 7a17 17 0 0 1-2.1 3.1" />
+      <path d="M6.6 6.7A16.8 16.8 0 0 0 2 12c1.4 2.6 5 7 10 7a9.8 9.8 0 0 0 5.4-1.7" />
+      <path d="M2 2l20 20" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </svg>
+  );
+}
+
 /**
  * 지도 위에 표시되는 가게 정보창
  *
@@ -65,7 +107,15 @@ function getWaitingProviderLink(
  * )}
  * ```
  */
-export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
+export function ShopInfoWindow({
+  shop,
+  isBookmarked,
+  isHidden,
+  isPersonalizationSubmitting,
+  onClose,
+  onToggleBookmark,
+  onToggleHidden,
+}: ShopInfoWindowProps) {
   const menuCategories = shop.menuCategoryIds.map((categoryId) => ({
     id: categoryId,
     label: getMenuCategoryLabel(categoryId),
@@ -117,10 +167,41 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
         </svg>
       </button>
 
+      <div className="absolute right-9 top-2 flex gap-2">
+        <button
+          type="button"
+          onClick={() => onToggleBookmark(shop)}
+          disabled={isPersonalizationSubmitting}
+          className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+            isBookmarked
+              ? 'bg-yellow-100 text-yellow-800 ring-1 ring-yellow-200 hover:bg-yellow-200'
+              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+          }`}
+          aria-label={isBookmarked ? '북마크 해제' : '북마크 추가'}
+          title={isBookmarked ? '북마크 해제' : '북마크 추가'}
+        >
+          <BookmarkIcon isActive={isBookmarked} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onToggleHidden(shop)}
+          disabled={isPersonalizationSubmitting}
+          className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+            isHidden
+              ? 'bg-red-100 text-red-800 ring-1 ring-red-200 hover:bg-red-200'
+              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+          }`}
+          aria-label={isHidden ? '숨김 해제' : '매장 숨기기'}
+          title={isHidden ? '숨김 해제' : '매장 숨기기'}
+        >
+          <HiddenIcon />
+        </button>
+      </div>
+
       {/* 가게 정보 */}
-      <div className="pr-6">
+      <div>
         {/* 헤더 */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="mb-3 flex items-start justify-between pr-24">
           <div className="flex-1">
             <h3 className="font-bold text-xl text-gray-900 mb-1 flex items-center gap-2">
               🍜 {shop.name}
@@ -172,6 +253,9 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
               <span className="flex-1">{shop.businessHours}</span>
             </p>
           )}
+        </div>
+
+        <div className="mt-3 space-y-2">
           {shop.instagramUrl && (
             <p className="text-sm flex items-center gap-2">
               <Image
@@ -191,6 +275,27 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
               </a>
             </p>
           )}
+
+          {shop.kakaoPlaceUrl && (
+            <p className="text-sm">
+              <a
+                href={shop.kakaoPlaceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline font-medium"
+              >
+                <Image
+                  src="/kakao-map-icon.png"
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="h-4 w-4 rounded-sm"
+                />
+                카카오맵에서 보기
+              </a>
+            </p>
+          )}
+
           {waitingProviderLink && (
             <p className="text-sm flex items-center gap-2">
               <span className="text-gray-400">대기</span>
@@ -213,27 +318,6 @@ export function ShopInfoWindow({ shop, onClose }: ShopInfoWindowProps) {
             </p>
           )}
         </div>
-
-        {/* 카카오맵 링크 */}
-        {shop.kakaoPlaceUrl && (
-          <p className="text-sm mt-3 pt-3 border-t border-gray-200">
-            <a
-              href={shop.kakaoPlaceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline font-medium"
-            >
-              <Image
-                src="/kakao-map-icon.png"
-                alt=""
-                width={16}
-                height={16}
-                className="h-4 w-4 rounded-sm"
-              />
-              카카오맵에서 보기
-            </a>
-          </p>
-        )}
       </div>
 
       {/* 상세 페이지 링크 (Phase 2-2에서 구현) */}

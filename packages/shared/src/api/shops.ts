@@ -269,6 +269,45 @@ export async function fetchShopById(id: string): Promise<Shop | null> {
 }
 
 /**
+ * 여러 Shop ID 기준 조회
+ *
+ * @param ids Shop ID 목록
+ * @returns Shop 목록
+ */
+export async function fetchShopsByIds(ids: string[]): Promise<Shop[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const uniqueIds = [...new Set(ids)];
+
+  try {
+    const { data, error } = await supabase
+      .from('shops')
+      .select('*')
+      .eq(VISIBLE_SHOP_FILTER.column, VISIBLE_SHOP_FILTER.value)
+      .in('id', uniqueIds);
+
+    if (error) {
+      console.error('[fetchShopsByIds Error]', error);
+      throw new Error(`Shop 목록을 가져올 수 없습니다: ${error.message}`);
+    }
+
+    const rowsById = new Map(
+      ((data ?? []) as ShopRow[]).map((row) => [row.id, row])
+    );
+
+    return uniqueIds
+      .map((id) => rowsById.get(id))
+      .filter((row): row is ShopRow => Boolean(row))
+      .map(mapShopRowToShop);
+  } catch (error) {
+    console.error('[fetchShopsByIds Error]', error);
+    throw error;
+  }
+}
+
+/**
  * Shop별 웨이팅 시스템 조회
  *
  * @param shopId Shop ID

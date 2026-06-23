@@ -5,7 +5,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapAuthButton } from '@/components/auth/MapAuthButton';
+import type { User } from '@supabase/supabase-js';
+import {
+  MapAuthButton,
+  type PersonalizationView,
+} from '@/components/auth/MapAuthButton';
 import { MapView } from '@/components/map/MapView';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useShopSearch } from '@/hooks/useShopSearch';
@@ -13,14 +17,27 @@ import { useShopsByBounds } from '@/hooks/useShopsByBounds';
 import { findAdministrativeRegion } from '@/lib/administrative-regions';
 import {
   MENU_CATEGORIES,
+  addShopBookmark,
+  fetchShopsByIds,
+  fetchUserShopPersonalization,
+  getCurrentSession,
+  getCurrentUser,
+  hideShop,
   normalizeShopSearchQuery,
+  onAuthStateChange,
+  removeShopBookmark,
   searchShops,
+  signInWithKakao,
+  signOut,
+  unhideShop,
 } from '@ramap/shared';
-import type { Location, MapBounds } from '@ramap/shared';
+import type { Location, MapBounds, Shop } from '@ramap/shared';
 
 // 기본 위치: 서울시청
 const DEFAULT_LOCATION = { lat: 37.5665, lng: 126.978 };
 const GEOLOCATION_PERMISSION_DENIED = 1;
+const LOGIN_GUIDE_MESSAGE =
+  '로그인하면 Shop 북마크와 숨김 기능을 사용할 수 있습니다.';
 
 function FilterIcon() {
   return (
@@ -51,14 +68,45 @@ export default function MapPage() {
     useState(false);
   const [mapCenter, setMapCenter] = useState<Location>(DEFAULT_LOCATION);
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [bookmarkedShopIds, setBookmarkedShopIds] = useState<string[]>([]);
+  const [hiddenShopIds, setHiddenShopIds] = useState<string[]>([]);
+  const [personalizationError, setPersonalizationError] = useState<
+    string | null
+  >(null);
+  const [isPersonalizationLoading, setIsPersonalizationLoading] =
+    useState(false);
+  const [isPersonalizationSubmitting, setIsPersonalizationSubmitting] =
+    useState(false);
+  const [personalizationView, setPersonalizationView] =
+    useState<PersonalizationView>('all');
+  const [personalizedShops, setPersonalizedShops] = useState<Shop[]>([]);
+  const [isLoadingPersonalizedShops, setIsLoadingPersonalizedShops] =
+    useState(false);
+  const [personalizedShopsError, setPersonalizedShopsError] = useState<
+    string | null
+  >(null);
+  const [loginGuideMessage, setLoginGuideMessage] = useState<string | null>(
+    null
+  );
+  const [isAccountDeletionDialogOpen, setIsAccountDeletionDialogOpen] =
+    useState(false);
+  const [accountDeletionError, setAccountDeletionError] = useState<
+    string | null
+  >(null);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const hasHandledInitialLocationRef = useRef(false);
   const lastAutoCenteredShopKeyRef = useRef<string | null>(null);
   const normalizedSearchQuery = normalizeShopSearchQuery(searchQuery);
   const hasSearchQuery = normalizedSearchQuery.length > 0;
   const focusedAdministrativeRegion = useMemo(
     () =>
-      hasSearchQuery ? findAdministrativeRegion(normalizedSearchQuery) : null,
-    [hasSearchQuery, normalizedSearchQuery]
+      hasSearchQuery && personalizationView === 'all'
+        ? findAdministrativeRegion(normalizedSearchQuery)
+        : null,
+    [hasSearchQuery, normalizedSearchQuery, personalizationView]
   );
   const activeShopBounds = focusedAdministrativeRegion?.bounds ?? mapBounds;
   const {
@@ -81,6 +129,154 @@ export default function MapPage() {
     menuCategoryIds: selectedMenuCategoryIds,
     limit: 50,
   });
+  const authRedirectTo = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const callbackUrl = new URL('/auth/callback', window.location.origin);
+    callbackUrl.searchParams.set('next', '/map');
+
+    return callbackUrl.toString();
+  }, []);
+
+  const bookmarkedShopIdSet = useMemo(
+    () => new Set(bookmarkedShopIds),
+    [bookmarkedShopIds]
+  );
+  const hiddenShopIdSet = useMemo(
+    () => new Set(hiddenShopIds),
+    [hiddenShopIds]
+  );
+  const isWaitingForAllViewPersonalization =
+    personalizationView === 'all' && Boolean(user) && isPersonalizationLoading;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getCurrentUser()
+      .then((currentUser) => {
+        if (isMounted) {
+          setUser(currentUser);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setUser(null);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsAuthLoading(false);
+        }
+      });
+
+    const unsubscribe = onAuthStateChange(({ session }) => {
+      setUser(session?.user ?? null);
+      setIsAuthLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!user) {
+      setBookmarkedShopIds([]);
+      setHiddenShopIds([]);
+      setPersonalizationView('all');
+      setPersonalizedShops([]);
+      setPersonalizationError(null);
+      setIsPersonalizationLoading(false);
+      return;
+    }
+
+    setIsPersonalizationLoading(true);
+    setPersonalizationError(null);
+
+    fetchUserShopPersonalization(user.id)
+      .then((personalization) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setBookmarkedShopIds(personalization.bookmarkedShopIds);
+        setHiddenShopIds(personalization.hiddenShopIds);
+      })
+      .catch((error: unknown) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setPersonalizationError(
+          error instanceof Error
+            ? error.message
+            : 'Shop 개인화 정보를 가져올 수 없습니다.'
+        );
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsPersonalizationLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const targetShopIds =
+      personalizationView === 'bookmarked'
+        ? bookmarkedShopIds
+        : personalizationView === 'hidden'
+          ? hiddenShopIds
+          : [];
+
+    if (personalizationView === 'all' || targetShopIds.length === 0) {
+      setPersonalizedShops([]);
+      setPersonalizedShopsError(null);
+      setIsLoadingPersonalizedShops(false);
+      return;
+    }
+
+    setPersonalizedShops([]);
+    setIsLoadingPersonalizedShops(true);
+    setPersonalizedShopsError(null);
+
+    fetchShopsByIds(targetShopIds)
+      .then((shopsByIds) => {
+        if (isMounted) {
+          setPersonalizedShops(shopsByIds);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setPersonalizedShops([]);
+        setPersonalizedShopsError(
+          error instanceof Error
+            ? error.message
+            : 'Shop 목록을 가져올 수 없습니다.'
+        );
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingPersonalizedShops(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [bookmarkedShopIds, hiddenShopIds, personalizationView]);
 
   // GPS 위치 변경 시 지도 중심 업데이트 (초기 한 번만)
   useEffect(() => {
@@ -138,9 +334,45 @@ export default function MapPage() {
       shops,
     ]
   );
+  const visibleSearchResults = useMemo(
+    () =>
+      personalizationView === 'all' && !isWaitingForAllViewPersonalization
+        ? searchResults.filter((result) => !hiddenShopIdSet.has(result.shop.id))
+        : searchResults,
+    [
+      hiddenShopIdSet,
+      isWaitingForAllViewPersonalization,
+      personalizationView,
+      searchResults,
+    ]
+  );
+  const personalizedSearchResults = useMemo(
+    () =>
+      searchShops(personalizedShops, {
+        query: hasSearchQuery ? effectiveSearchQuery : '',
+        menuCategoryIds: selectedMenuCategoryIds,
+      }),
+    [
+      effectiveSearchQuery,
+      hasSearchQuery,
+      personalizedShops,
+      selectedMenuCategoryIds,
+    ]
+  );
   const filteredShops = useMemo(
-    () => searchResults.map((result) => result.shop),
-    [searchResults]
+    () =>
+      (isWaitingForAllViewPersonalization
+        ? []
+        : personalizationView === 'all'
+          ? visibleSearchResults
+          : personalizedSearchResults
+      ).map((result) => result.shop),
+    [
+      isWaitingForAllViewPersonalization,
+      personalizationView,
+      personalizedSearchResults,
+      visibleSearchResults,
+    ]
   );
   const searchFocusShopsKey = useMemo(() => {
     if (
@@ -209,38 +441,26 @@ export default function MapPage() {
 
   const hasSelectedFilters = selectedMenuCategoryIds.length > 0;
   const hasActiveRefinement = hasSearchQuery || hasSelectedFilters;
+  const hasActivePersonalizationView = personalizationView !== 'all';
   const usesGlobalSearchResults =
-    hasSearchQuery && !focusedAdministrativeRegion;
-  const visibleSourceShopCount = usesGlobalSearchResults
-    ? globalSearchShops.length
-    : focusedAdministrativeRegion && areBoundsShopsStale
-      ? 0
-      : shops.length;
-  const isLoadingVisibleShops = usesGlobalSearchResults
-    ? isLoadingGlobalSearch
-    : isLoadingShops || (focusedAdministrativeRegion && areBoundsShopsStale);
+    personalizationView === 'all' &&
+    hasSearchQuery &&
+    !focusedAdministrativeRegion;
+  const isLoadingVisibleShops = isWaitingForAllViewPersonalization
+    ? true
+    : usesGlobalSearchResults
+      ? isLoadingGlobalSearch
+      : hasActivePersonalizationView
+        ? isPersonalizationLoading || isLoadingPersonalizedShops
+        : isLoadingShops ||
+          (focusedAdministrativeRegion && areBoundsShopsStale);
   const visibleShopsError = usesGlobalSearchResults
     ? globalSearchError
-    : focusedAdministrativeRegion && areBoundsShopsStale
-      ? null
-      : shopsError;
-  const headerSummary = focusedAdministrativeRegion
-    ? `${focusedAdministrativeRegion.canonicalName} 라멘 가게 ${
-        filteredShops.length
-      }곳${
-        hasSelectedFilters
-          ? ` / 지역 ${visibleSourceShopCount}곳 · 필터 ${selectedMenuCategoryIds.length}개`
-          : ''
-      }`
-    : hasSearchQuery
-      ? `전체 검색 결과 ${filteredShops.length}곳${
-          hasSelectedFilters
-            ? ` · 필터 ${selectedMenuCategoryIds.length}개`
-            : ''
-        }`
-      : hasActiveRefinement
-        ? `검색 결과 ${filteredShops.length}곳 / 주변 ${visibleSourceShopCount}곳`
-        : `주변 라멘 가게 ${visibleSourceShopCount}곳`;
+    : hasActivePersonalizationView
+      ? (personalizationError ?? personalizedShopsError)
+      : focusedAdministrativeRegion && areBoundsShopsStale
+        ? null
+        : shopsError;
 
   useEffect(() => {
     if (!hasSearchQuery) {
@@ -331,40 +551,188 @@ export default function MapPage() {
     requestLocation();
   }, [requestLocation]);
 
+  const showLoginGuide = useCallback(() => {
+    setLoginGuideMessage(LOGIN_GUIDE_MESSAGE);
+  }, []);
+
+  const handleLogin = useCallback(async () => {
+    setIsAuthSubmitting(true);
+
+    try {
+      await signInWithKakao({ redirectTo: authRedirectTo });
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  }, [authRedirectTo]);
+
+  const handleLogout = useCallback(async () => {
+    setIsAuthSubmitting(true);
+
+    try {
+      await signOut();
+      setUser(null);
+      setPersonalizationView('all');
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  }, []);
+
+  const handleToggleBookmark = useCallback(
+    async (shop: Shop) => {
+      if (!user) {
+        showLoginGuide();
+        return;
+      }
+
+      const isBookmarked = bookmarkedShopIdSet.has(shop.id);
+      setIsPersonalizationSubmitting(true);
+      setPersonalizationError(null);
+
+      try {
+        if (isBookmarked) {
+          await removeShopBookmark(shop.id);
+          setBookmarkedShopIds((current) =>
+            current.filter((shopId) => shopId !== shop.id)
+          );
+        } else {
+          await addShopBookmark(shop.id);
+          setBookmarkedShopIds((current) =>
+            current.includes(shop.id) ? current : [...current, shop.id]
+          );
+        }
+      } catch (error) {
+        setPersonalizationError(
+          error instanceof Error
+            ? error.message
+            : 'Shop 북마크 상태를 변경할 수 없습니다.'
+        );
+      } finally {
+        setIsPersonalizationSubmitting(false);
+      }
+    },
+    [bookmarkedShopIdSet, showLoginGuide, user]
+  );
+
+  const handleToggleHidden = useCallback(
+    async (shop: Shop) => {
+      if (!user) {
+        showLoginGuide();
+        return;
+      }
+
+      const isHidden = hiddenShopIdSet.has(shop.id);
+      setIsPersonalizationSubmitting(true);
+      setPersonalizationError(null);
+
+      try {
+        if (isHidden) {
+          await unhideShop(shop.id);
+          setHiddenShopIds((current) =>
+            current.filter((shopId) => shopId !== shop.id)
+          );
+        } else {
+          await hideShop(shop.id);
+          setHiddenShopIds((current) =>
+            current.includes(shop.id) ? current : [...current, shop.id]
+          );
+        }
+      } catch (error) {
+        setPersonalizationError(
+          error instanceof Error
+            ? error.message
+            : 'Shop 숨김 상태를 변경할 수 없습니다.'
+        );
+      } finally {
+        setIsPersonalizationSubmitting(false);
+      }
+    },
+    [hiddenShopIdSet, showLoginGuide, user]
+  );
+
+  const handleShowBookmarkedShops = useCallback(() => {
+    if (!user) {
+      showLoginGuide();
+      return;
+    }
+
+    setPersonalizationView((current) =>
+      current === 'bookmarked' ? 'all' : 'bookmarked'
+    );
+  }, [showLoginGuide, user]);
+
+  const handleShowHiddenShops = useCallback(() => {
+    if (!user) {
+      showLoginGuide();
+      return;
+    }
+
+    setPersonalizationView((current) =>
+      current === 'hidden' ? 'all' : 'hidden'
+    );
+  }, [showLoginGuide, user]);
+
+  const handleDeleteAccount = useCallback(async () => {
+    setIsDeletingAccount(true);
+    setAccountDeletionError(null);
+
+    try {
+      const session = await getCurrentSession();
+
+      if (!session?.access_token) {
+        throw new Error('다시 로그인한 뒤 계정 삭제를 시도해주세요.');
+      }
+
+      const response = await fetch('/api/account', {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+
+        throw new Error(
+          body?.error ?? '계정 삭제 서버 설정을 확인해야 합니다.'
+        );
+      }
+
+      try {
+        await signOut();
+      } catch {
+        // The Auth user may already be deleted, so local state cleanup must win.
+      } finally {
+        setUser(null);
+        setBookmarkedShopIds([]);
+        setHiddenShopIds([]);
+        setPersonalizedShops([]);
+        setPersonalizationView('all');
+        setPersonalizationError(null);
+        setPersonalizedShopsError(null);
+        setLoginGuideMessage(null);
+        setIsAccountDeletionDialogOpen(false);
+      }
+    } catch (error) {
+      setAccountDeletionError(
+        error instanceof Error ? error.message : '계정을 삭제할 수 없습니다.'
+      );
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }, []);
+
   return (
     <div className="h-screen flex flex-col">
-      {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Ramap</h1>
-          <p className="text-sm text-gray-600">
-            {geoLoading ? (
-              <span className="flex items-center gap-1">
-                <span className="inline-block animate-spin rounded-full h-3 w-3 border-b border-gray-600" />
-                위치 확인 중...
-              </span>
-            ) : isLoadingVisibleShops ? (
-              <span className="flex items-center gap-1">
-                <span className="inline-block animate-spin rounded-full h-3 w-3 border-b border-gray-600" />
-                가게 검색 중...
-              </span>
-            ) : (
-              headerSummary
-            )}
-          </p>
-        </div>
-        {geoError && (
-          <div className="text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
-            위치 권한 없음 (기본 위치)
-          </div>
-        )}
-      </header>
-
       {/* 지도 */}
       <main className="flex-1 relative">
         <MapView
           center={mapCenter}
           shops={filteredShops}
+          bookmarkedShopIds={bookmarkedShopIdSet}
+          hiddenShopIds={hiddenShopIdSet}
+          isPersonalizationSubmitting={isPersonalizationSubmitting}
           focusBounds={focusedAdministrativeRegion?.bounds}
           focusBoundsKey={administrativeRegionFocusKey}
           focusShops={
@@ -377,6 +745,8 @@ export default function MapPage() {
           focusShopKey={singleSearchFocusShopKey}
           zoom={3}
           onBoundsChange={handleBoundsChange}
+          onToggleBookmark={handleToggleBookmark}
+          onToggleHidden={handleToggleHidden}
         />
 
         <section className="absolute left-0 right-0 top-0 z-20 px-4 pt-4 pointer-events-none">
@@ -466,6 +836,21 @@ export default function MapPage() {
 
         <button
           type="button"
+          onClick={handleShowBookmarkedShops}
+          className={`absolute bottom-4 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-semibold shadow-xl ring-2 ring-white transition-colors ${
+            personalizationView === 'bookmarked'
+              ? 'bg-yellow-400 text-gray-950 hover:bg-yellow-500'
+              : 'bg-white text-gray-800 hover:bg-gray-100'
+          }`}
+          aria-label="북마크한 Shop만 보기"
+          aria-pressed={personalizationView === 'bookmarked'}
+          title="북마크한 Shop만 보기"
+        >
+          {personalizationView === 'bookmarked' ? '★' : '☆'}
+        </button>
+
+        <button
+          type="button"
           onClick={handleMoveToCurrentLocation}
           className="absolute bottom-20 left-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl font-semibold text-gray-800 shadow-xl ring-2 ring-white transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-70"
           aria-label="현재 위치로 이동"
@@ -479,7 +864,102 @@ export default function MapPage() {
           )}
         </button>
 
-        <MapAuthButton />
+        <MapAuthButton
+          user={user}
+          isLoading={isAuthLoading}
+          isSubmitting={isAuthSubmitting}
+          activeView={personalizationView}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+          onShowHiddenShops={handleShowHiddenShops}
+          onRequestAccountDeletion={() => setIsAccountDeletionDialogOpen(true)}
+        />
+
+        {loginGuideMessage && (
+          <div
+            className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 px-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="login-guide-title"
+          >
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+              <h2
+                id="login-guide-title"
+                className="text-lg font-semibold text-gray-900"
+              >
+                로그인이 필요합니다
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                {loginGuideMessage}
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLoginGuideMessage(null)}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                >
+                  닫기
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogin}
+                  className="rounded-lg bg-[#FEE500] px-4 py-2 text-sm font-semibold text-[#191919] transition-colors hover:bg-[#F4D800] disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isAuthSubmitting}
+                >
+                  카카오 로그인
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isAccountDeletionDialogOpen && (
+          <div
+            className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 px-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="account-deletion-title"
+          >
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+              <h2
+                id="account-deletion-title"
+                className="text-lg font-semibold text-gray-900"
+              >
+                계정을 삭제할까요?
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                계정과 Supabase Auth 사용자가 삭제됩니다. 서버에
+                SUPABASE_SERVICE_ROLE_KEY가 설정되어 있어야 실행됩니다.
+              </p>
+              {accountDeletionError && (
+                <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {accountDeletionError}
+                </p>
+              )}
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAccountDeletionDialogOpen(false);
+                    setAccountDeletionError(null);
+                  }}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                  disabled={isDeletingAccount}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isDeletingAccount}
+                >
+                  {isDeletingAccount ? '삭제 중...' : '계정 삭제'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {isLocationPermissionDialogOpen && (
           <div
@@ -547,14 +1027,18 @@ export default function MapPage() {
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 max-w-sm text-center">
               <div className="text-4xl mb-3">🍜</div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {hasActiveRefinement
-                  ? '조건에 맞는 가게가 없습니다'
-                  : '주변에 가게가 없습니다'}
+                {hasActivePersonalizationView
+                  ? `${personalizationView === 'bookmarked' ? '북마크한' : '숨긴'} Shop이 없습니다`
+                  : hasActiveRefinement
+                    ? '조건에 맞는 가게가 없습니다'
+                    : '주변에 가게가 없습니다'}
               </h3>
               <p className="text-sm text-gray-600">
-                {hasActiveRefinement
-                  ? '검색어나 필터를 바꾸면 주변 가게를 다시 볼 수 있습니다.'
-                  : '다른 지역을 검색하거나 지도를 이동해보세요.'}
+                {hasActivePersonalizationView
+                  ? '현재 보기 버튼을 다시 누르면 전체 매장으로 돌아갑니다.'
+                  : hasActiveRefinement
+                    ? '검색어나 필터를 바꾸면 주변 가게를 다시 볼 수 있습니다.'
+                    : '다른 지역을 검색하거나 지도를 이동해보세요.'}
               </p>
             </div>
           )}

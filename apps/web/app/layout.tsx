@@ -1,10 +1,28 @@
 import type { Metadata } from 'next';
+import localFont from 'next/font/local';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Ramap - 라멘 지도',
   description: '라멘 오타쿠를 위한 전국 라멘 지도 서비스',
 };
+
+const satoshi = localFont({
+  src: [
+    {
+      path: './fonts/Satoshi-Variable.woff2',
+      style: 'normal',
+      weight: '300 900',
+    },
+    {
+      path: './fonts/Satoshi-VariableItalic.woff2',
+      style: 'italic',
+      weight: '300 900',
+    },
+  ],
+  display: 'swap',
+  variable: '--font-satoshi',
+});
 
 export default function RootLayout({
   children,
@@ -19,7 +37,7 @@ export default function RootLayout({
   );
 
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="ko" className={satoshi.variable} suppressHydrationWarning>
       <head>
         {hasKakaoMapKey ? (
           <script
