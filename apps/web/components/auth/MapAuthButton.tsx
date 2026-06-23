@@ -73,12 +73,8 @@ function MenuButton({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${
-        isDanger
-          ? 'text-red-700 hover:bg-red-50'
-          : isActive
-            ? 'bg-gray-900 text-white'
-            : 'text-gray-800 hover:bg-gray-100'
+      className={`ds-menu-item ${isActive ? 'ds-menu-item-active' : ''} ${
+        isDanger ? 'text-gray-950' : ''
       }`}
     >
       {children}
@@ -127,8 +123,8 @@ export function MapAuthButton({
   return (
     <div className="absolute bottom-36 right-4 z-30">
       {user && isMenuOpen && (
-        <div className="absolute bottom-16 right-0 w-56 rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-black/10">
-          <div className="mb-1 truncate px-3 py-2 text-xs font-semibold text-gray-500">
+        <div className="ds-panel absolute bottom-16 right-0 w-56 p-2">
+          <div className="mb-1 truncate px-3 py-2 text-xs font-medium uppercase tracking-[0.05em] text-gray-500">
             {menuTitle}
           </div>
           <MenuButton
@@ -152,10 +148,10 @@ export function MapAuthButton({
         type="button"
         onClick={handleMainClick}
         disabled={isDisabled}
-        className={`flex h-14 w-14 items-center justify-center rounded-full text-sm font-bold shadow-xl ring-2 ring-white transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
+        className={`ds-icon-button h-14 w-14 text-sm font-bold shadow-[var(--ds-shadow-soft)] ring-2 ring-white disabled:cursor-not-allowed disabled:opacity-70 ${
           user
-            ? 'bg-gray-900 text-white hover:bg-gray-700'
-            : 'bg-[#FEE500] text-[#191919] hover:bg-[#F4D800]'
+            ? 'ds-icon-button-active'
+            : 'bg-[#FEE500] text-[#191919] hover:bg-[#FEE500]'
         }`}
         aria-label={label}
         aria-expanded={user ? isMenuOpen : undefined}

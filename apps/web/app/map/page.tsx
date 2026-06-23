@@ -39,13 +39,13 @@ const GEOLOCATION_PERMISSION_DENIED = 1;
 const LOGIN_GUIDE_MESSAGE =
   '로그인하면 Shop 북마크와 숨김 기능을 사용할 수 있습니다.';
 
-function FilterIcon() {
+function FilterIcon({ isActive }: { isActive: boolean }) {
   return (
     <img
       aria-hidden="true"
       src="/filter-icon.png"
       alt=""
-      className="h-6 w-6 invert"
+      className={`h-6 w-6 ${isActive ? 'invert' : ''}`}
     />
   );
 }
@@ -93,6 +93,7 @@ export default function MapPage() {
   );
   const [isAccountDeletionDialogOpen, setIsAccountDeletionDialogOpen] =
     useState(false);
+  const [shopPendingHide, setShopPendingHide] = useState<Shop | null>(null);
   const [accountDeletionError, setAccountDeletionError] = useState<
     string | null
   >(null);
@@ -192,6 +193,7 @@ export default function MapPage() {
       setPersonalizedShops([]);
       setPersonalizationError(null);
       setIsPersonalizationLoading(false);
+      setShopPendingHide(null);
       return;
     }
 
@@ -572,6 +574,7 @@ export default function MapPage() {
       await signOut();
       setUser(null);
       setPersonalizationView('all');
+      setShopPendingHide(null);
     } finally {
       setIsAuthSubmitting(false);
     }
@@ -621,21 +624,20 @@ export default function MapPage() {
       }
 
       const isHidden = hiddenShopIdSet.has(shop.id);
+
+      if (!isHidden) {
+        setShopPendingHide(shop);
+        return;
+      }
+
       setIsPersonalizationSubmitting(true);
       setPersonalizationError(null);
 
       try {
-        if (isHidden) {
-          await unhideShop(shop.id);
-          setHiddenShopIds((current) =>
-            current.filter((shopId) => shopId !== shop.id)
-          );
-        } else {
-          await hideShop(shop.id);
-          setHiddenShopIds((current) =>
-            current.includes(shop.id) ? current : [...current, shop.id]
-          );
-        }
+        await unhideShop(shop.id);
+        setHiddenShopIds((current) =>
+          current.filter((shopId) => shopId !== shop.id)
+        );
       } catch (error) {
         setPersonalizationError(
           error instanceof Error
@@ -648,6 +650,32 @@ export default function MapPage() {
     },
     [hiddenShopIdSet, showLoginGuide, user]
   );
+
+  const handleConfirmHideShop = useCallback(async () => {
+    if (!shopPendingHide) {
+      return;
+    }
+
+    const shop = shopPendingHide;
+    setIsPersonalizationSubmitting(true);
+    setPersonalizationError(null);
+
+    try {
+      await hideShop(shop.id);
+      setHiddenShopIds((current) =>
+        current.includes(shop.id) ? current : [...current, shop.id]
+      );
+      setShopPendingHide(null);
+    } catch (error) {
+      setPersonalizationError(
+        error instanceof Error
+          ? error.message
+          : 'Shop 숨김 상태를 변경할 수 없습니다.'
+      );
+    } finally {
+      setIsPersonalizationSubmitting(false);
+    }
+  }, [shopPendingHide]);
 
   const handleShowBookmarkedShops = useCallback(() => {
     if (!user) {
@@ -713,6 +741,7 @@ export default function MapPage() {
         setPersonalizedShopsError(null);
         setLoginGuideMessage(null);
         setIsAccountDeletionDialogOpen(false);
+        setShopPendingHide(null);
       }
     } catch (error) {
       setAccountDeletionError(
@@ -754,7 +783,7 @@ export default function MapPage() {
             라멘 가게 검색
           </label>
           <div className="pointer-events-auto mx-auto max-w-3xl">
-            <div className="relative rounded-2xl bg-white shadow-lg ring-1 ring-black/5">
+            <div className="ds-panel relative rounded-[24px]">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl leading-none text-gray-800">
                 ⌕
               </span>
@@ -764,13 +793,13 @@ export default function MapPage() {
                 onChange={(event) => setSearchQuery(event.target.value)}
                 type="search"
                 placeholder="가게명, 주소, 전화번호"
-                className="h-14 w-full rounded-2xl border-0 bg-white pl-12 pr-16 text-base text-gray-900 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-red-500/30"
+                className="h-14 w-full rounded-[24px] border-0 bg-white pl-12 pr-16 text-base font-[480] text-black outline-none placeholder:font-[330] placeholder:text-gray-500 focus:ring-2 focus:ring-black/20"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full px-3 py-1 text-sm font-medium text-black hover:bg-[var(--ds-surface-soft)]"
                   aria-label="검색어 지우기"
                 >
                   지우기
@@ -781,7 +810,7 @@ export default function MapPage() {
         </section>
 
         {isMoreFiltersOpen && (
-          <div className="absolute bottom-52 left-4 right-4 z-30 rounded-2xl bg-white p-3 shadow-xl ring-1 ring-black/5 sm:left-auto sm:w-96">
+          <div className="ds-panel absolute bottom-52 left-4 right-4 z-30 p-3 sm:left-auto sm:w-96">
             <div className="grid grid-cols-2 gap-2">
               {MENU_CATEGORIES.map((filter) => {
                 const isSelected = selectedMenuCategoryIds.includes(filter.id);
@@ -791,10 +820,10 @@ export default function MapPage() {
                     key={filter.id}
                     type="button"
                     onClick={() => toggleMenuCategory(filter.id)}
-                    className={`min-h-10 rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                    className={`min-h-10 rounded-full px-3 py-2 text-sm font-semibold transition-colors ${
                       isSelected
-                        ? 'bg-red-600 text-white'
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                        ? 'bg-black text-white'
+                        : 'bg-[var(--ds-surface-soft)] text-black hover:bg-[var(--ds-surface-soft)]'
                     }`}
                   >
                     {filter.label}
@@ -807,7 +836,7 @@ export default function MapPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedMenuCategoryIds([])}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-lg font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+                  className="ds-icon-button h-10 w-10 text-lg font-semibold"
                   aria-label="선택한 필터 초기화"
                   title="선택한 필터 초기화"
                 >
@@ -821,12 +850,14 @@ export default function MapPage() {
         <button
           type="button"
           onClick={() => setIsMoreFiltersOpen((current) => !current)}
-          className="absolute bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl ring-2 ring-white transition-colors hover:bg-blue-700"
+          className={`ds-icon-button absolute bottom-20 right-4 z-30 h-14 w-14 shadow-[var(--ds-shadow-soft)] ring-2 ring-white ${
+            isMoreFiltersOpen ? 'ds-icon-button-active' : ''
+          }`}
           aria-label="메뉴 필터"
           aria-expanded={isMoreFiltersOpen}
           title="메뉴 필터"
         >
-          <FilterIcon />
+          <FilterIcon isActive={isMoreFiltersOpen} />
           {hasSelectedFilters && (
             <span className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-gray-950 px-1.5 text-xs font-bold text-white ring-2 ring-white">
               {selectedMenuCategoryIds.length}
@@ -837,10 +868,10 @@ export default function MapPage() {
         <button
           type="button"
           onClick={handleShowBookmarkedShops}
-          className={`absolute bottom-4 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-semibold shadow-xl ring-2 ring-white transition-colors ${
+          className={`ds-icon-button absolute bottom-4 right-4 z-30 h-14 w-14 text-2xl font-semibold shadow-[var(--ds-shadow-soft)] ring-2 ring-white ${
             personalizationView === 'bookmarked'
-              ? 'bg-yellow-400 text-gray-950 hover:bg-yellow-500'
-              : 'bg-white text-gray-800 hover:bg-gray-100'
+              ? 'ds-icon-button-active'
+              : ''
           }`}
           aria-label="북마크한 Shop만 보기"
           aria-pressed={personalizationView === 'bookmarked'}
@@ -852,7 +883,7 @@ export default function MapPage() {
         <button
           type="button"
           onClick={handleMoveToCurrentLocation}
-          className="absolute bottom-20 left-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl font-semibold text-gray-800 shadow-xl ring-2 ring-white transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-70"
+          className="ds-icon-button absolute bottom-20 left-4 z-30 h-14 w-14 text-2xl font-semibold shadow-[var(--ds-shadow-soft)] ring-2 ring-white disabled:cursor-not-allowed disabled:opacity-70"
           aria-label="현재 위치로 이동"
           title="현재 위치로 이동"
           disabled={geoLoading && hasRequestedCurrentLocation}
@@ -860,7 +891,22 @@ export default function MapPage() {
           {geoLoading && hasRequestedCurrentLocation ? (
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-b-gray-800" />
           ) : (
-            '⌖'
+            <svg
+              aria-hidden="true"
+              className="h-8 w-8"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            >
+              <circle cx="12" cy="12" r="5" />
+              <path d="M12 2v4" />
+              <path d="M12 18v4" />
+              <path d="M2 12h4" />
+              <path d="M18 12h4" />
+            </svg>
           )}
         </button>
 
@@ -877,12 +923,12 @@ export default function MapPage() {
 
         {loginGuideMessage && (
           <div
-            className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 px-4"
+            className="absolute inset-0 z-40 flex items-center justify-center bg-[var(--ds-overlay-scrim)] px-4"
             role="dialog"
             aria-modal="true"
             aria-labelledby="login-guide-title"
           >
-            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="ds-modal-panel w-full max-w-sm p-5">
               <h2
                 id="login-guide-title"
                 className="text-lg font-semibold text-gray-900"
@@ -896,14 +942,14 @@ export default function MapPage() {
                 <button
                   type="button"
                   onClick={() => setLoginGuideMessage(null)}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                  className="ds-pill-button ds-pill-secondary"
                 >
                   닫기
                 </button>
                 <button
                   type="button"
                   onClick={handleLogin}
-                  className="rounded-lg bg-[#FEE500] px-4 py-2 text-sm font-semibold text-[#191919] transition-colors hover:bg-[#F4D800] disabled:cursor-not-allowed disabled:opacity-70"
+                  className="ds-pill-button bg-[#FEE500] text-[#191919] disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isAuthSubmitting}
                 >
                   카카오 로그인
@@ -913,14 +959,54 @@ export default function MapPage() {
           </div>
         )}
 
+        {shopPendingHide && (
+          <div
+            className="absolute inset-0 z-40 flex items-center justify-center bg-[var(--ds-overlay-scrim)] px-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="hide-shop-title"
+          >
+            <div className="ds-modal-panel w-full max-w-sm p-5">
+              <h2
+                id="hide-shop-title"
+                className="text-lg font-semibold text-gray-900"
+              >
+                이 매장을 숨기시겠습니까?
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                숨긴 매장은 지도에서 제외되며, 설정의 숨긴 매장 보기에서
+                다시 확인할 수 있습니다.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShopPendingHide(null)}
+                  className="ds-pill-button ds-pill-secondary"
+                  disabled={isPersonalizationSubmitting}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmHideShop}
+                  className="ds-pill-button ds-pill-primary disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={isPersonalizationSubmitting}
+                >
+                  {isPersonalizationSubmitting ? '숨기는 중...' : '숨기기'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {isAccountDeletionDialogOpen && (
           <div
-            className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 px-4"
+            className="absolute inset-0 z-40 flex items-center justify-center bg-[var(--ds-overlay-scrim)] px-4"
             role="dialog"
             aria-modal="true"
             aria-labelledby="account-deletion-title"
           >
-            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="ds-modal-panel w-full max-w-sm p-5">
               <h2
                 id="account-deletion-title"
                 className="text-lg font-semibold text-gray-900"
@@ -932,7 +1018,7 @@ export default function MapPage() {
                 SUPABASE_SERVICE_ROLE_KEY가 설정되어 있어야 실행됩니다.
               </p>
               {accountDeletionError && (
-                <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                <p className="mt-3 rounded-lg border border-[var(--ds-hairline)] bg-[var(--ds-surface-soft)] px-3 py-2 text-sm text-black">
                   {accountDeletionError}
                 </p>
               )}
@@ -943,7 +1029,7 @@ export default function MapPage() {
                     setIsAccountDeletionDialogOpen(false);
                     setAccountDeletionError(null);
                   }}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                  className="ds-pill-button ds-pill-secondary"
                   disabled={isDeletingAccount}
                 >
                   취소
@@ -951,7 +1037,7 @@ export default function MapPage() {
                 <button
                   type="button"
                   onClick={handleDeleteAccount}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="ds-pill-button ds-pill-primary disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={isDeletingAccount}
                 >
                   {isDeletingAccount ? '삭제 중...' : '계정 삭제'}
@@ -963,12 +1049,12 @@ export default function MapPage() {
 
         {isLocationPermissionDialogOpen && (
           <div
-            className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 px-4"
+            className="absolute inset-0 z-40 flex items-center justify-center bg-[var(--ds-overlay-scrim)] px-4"
             role="dialog"
             aria-modal="true"
             aria-labelledby="location-permission-title"
           >
-            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="ds-modal-panel w-full max-w-sm p-5">
               <h2
                 id="location-permission-title"
                 className="text-lg font-semibold text-gray-900"
@@ -982,14 +1068,14 @@ export default function MapPage() {
                 <button
                   type="button"
                   onClick={() => setIsLocationPermissionDialogOpen(false)}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                  className="ds-pill-button ds-pill-secondary"
                 >
                   닫기
                 </button>
                 <button
                   type="button"
                   onClick={handleRetryLocationPermission}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="ds-pill-button ds-pill-primary disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={geoLoading}
                 >
                   다시 시도
@@ -1001,19 +1087,21 @@ export default function MapPage() {
 
         {/* 가게 로딩 오버레이 */}
         {isLoadingVisibleShops && (
-          <div className="absolute top-40 left-1/2 z-20 transform -translate-x-1/2 bg-white rounded-lg shadow-md px-4 py-2 flex items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
-            <span className="text-sm text-gray-700">가게 검색 중...</span>
+          <div className="ds-panel absolute left-1/2 top-40 z-20 flex -translate-x-1/2 items-center gap-2 px-4 py-2">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-b-black" />
+            <span className="text-sm font-medium text-black">
+              가게 검색 중...
+            </span>
           </div>
         )}
 
         {/* 가게 로드 에러 */}
         {visibleShopsError && (
-          <div className="absolute top-40 left-1/2 z-20 transform -translate-x-1/2 bg-red-50 border border-red-200 rounded-lg shadow-md px-4 py-3 max-w-md">
-            <p className="text-sm text-red-800">{visibleShopsError}</p>
+          <div className="ds-panel absolute left-1/2 top-40 z-20 max-w-md -translate-x-1/2 px-4 py-3">
+            <p className="text-sm text-black">{visibleShopsError}</p>
             <button
               onClick={() => window.location.reload()}
-              className="mt-2 text-xs text-red-600 hover:text-red-800 font-medium"
+              className="mt-2 text-xs font-medium uppercase tracking-[0.05em] text-black"
             >
               다시 시도
             </button>
@@ -1024,7 +1112,7 @@ export default function MapPage() {
         {!isLoadingVisibleShops &&
           !visibleShopsError &&
           filteredShops.length === 0 && (
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 max-w-sm text-center">
+            <div className="ds-panel absolute left-1/2 top-1/2 max-w-sm -translate-x-1/2 -translate-y-1/2 p-6 text-center">
               <div className="text-4xl mb-3">🍜</div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 {hasActivePersonalizationView

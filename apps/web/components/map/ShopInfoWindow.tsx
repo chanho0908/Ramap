@@ -147,35 +147,14 @@ export function ShopInfoWindow({
   const waitingProviderLink = getWaitingProviderLink(waitingSystem);
 
   return (
-    <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl p-5 w-11/12 max-w-md z-30 animate-fade-in border border-gray-100">
-      {/* 닫기 버튼 */}
-      <button
-        onClick={onClose}
-        className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"
-        aria-label="정보창 닫기"
-      >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-
-      <div className="absolute right-9 top-2 flex gap-2">
+    <div className="ds-panel absolute bottom-20 left-1/2 z-30 w-11/12 max-w-md -translate-x-1/2 transform animate-fade-in p-5">
+      <div className="absolute right-2 top-2 flex gap-2">
         <button
           type="button"
           onClick={() => onToggleBookmark(shop)}
           disabled={isPersonalizationSubmitting}
-          className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-            isBookmarked
-              ? 'bg-yellow-100 text-yellow-800 ring-1 ring-yellow-200 hover:bg-yellow-200'
-              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+          className={`ds-icon-button h-9 w-9 disabled:cursor-not-allowed disabled:opacity-60 ${
+            isBookmarked ? 'ds-icon-button-active' : ''
           }`}
           aria-label={isBookmarked ? '북마크 해제' : '북마크 추가'}
           title={isBookmarked ? '북마크 해제' : '북마크 추가'}
@@ -186,32 +165,49 @@ export function ShopInfoWindow({
           type="button"
           onClick={() => onToggleHidden(shop)}
           disabled={isPersonalizationSubmitting}
-          className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-            isHidden
-              ? 'bg-red-100 text-red-800 ring-1 ring-red-200 hover:bg-red-200'
-              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+          className={`ds-icon-button h-9 w-9 disabled:cursor-not-allowed disabled:opacity-60 ${
+            isHidden ? 'ds-icon-button-active' : ''
           }`}
           aria-label={isHidden ? '숨김 해제' : '매장 숨기기'}
           title={isHidden ? '숨김 해제' : '매장 숨기기'}
         >
           <HiddenIcon />
         </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="ds-icon-button h-9 w-9 text-gray-600"
+          aria-label="정보창 닫기"
+          title="정보창 닫기"
+        >
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       {/* 가게 정보 */}
       <div>
         {/* 헤더 */}
-        <div className="mb-3 flex items-start justify-between pr-24">
+        <div className="mb-3 flex items-start justify-between pt-10 sm:pt-0 sm:pr-44">
           <div className="flex-1">
-            <h3 className="font-bold text-xl text-gray-900 mb-1 flex items-center gap-2">
+            <h3 className="mb-1 flex items-center gap-2 text-xl font-bold text-black">
               🍜 {shop.name}
             </h3>
             {shop.kakaoRating && shop.kakaoRating > 0 && (
-              <div className="inline-flex items-center gap-1 bg-yellow-50 px-3 py-1 rounded-full border border-yellow-200">
-                <span className="text-yellow-600 font-semibold text-sm">
+              <div className="inline-flex items-center gap-1 rounded-full border border-[var(--ds-hairline)] bg-[var(--ds-surface-soft)] px-3 py-1">
+                <span className="text-sm font-semibold text-black">
                   ⭐ {shop.kakaoRating.toFixed(1)}
                 </span>
-                <span className="text-xs text-yellow-700">카카오 평점</span>
+                <span className="text-xs text-gray-600">카카오 평점</span>
               </div>
             )}
           </div>
@@ -222,7 +218,7 @@ export function ShopInfoWindow({
             {menuCategories.map((category) => (
               <span
                 key={category.id}
-                className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-100"
+                className="rounded-full bg-[var(--ds-surface-soft)] px-2.5 py-1 text-xs font-semibold text-black ring-1 ring-[var(--ds-hairline)]"
               >
                 {category.label}
               </span>
@@ -232,23 +228,23 @@ export function ShopInfoWindow({
 
         {/* 기본 정보 */}
         <div className="space-y-2 mb-3">
-          <p className="text-sm text-gray-700 flex items-start gap-2">
+          <p className="flex items-start gap-2 text-sm text-black">
             <span className="text-gray-400">📍</span>
             <span className="flex-1">{shop.address}</span>
           </p>
           {shop.phone && (
-            <p className="text-sm text-gray-700 flex items-center gap-2">
+            <p className="flex items-center gap-2 text-sm text-black">
               <span className="text-gray-400">📞</span>
               <a
                 href={`tel:${shop.phone}`}
-                className="text-blue-600 hover:text-blue-800 hover:underline"
+                className="font-medium text-black underline-offset-4 hover:underline"
               >
                 {shop.phone}
               </a>
             </p>
           )}
           {shop.businessHours && (
-            <p className="text-sm text-gray-700 flex items-start gap-2">
+            <p className="flex items-start gap-2 text-sm text-black">
               <span className="text-gray-400">🕒</span>
               <span className="flex-1">{shop.businessHours}</span>
             </p>
@@ -269,7 +265,7 @@ export function ShopInfoWindow({
                 href={shop.instagramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-purple-600 hover:text-purple-800 hover:underline font-medium"
+                className="font-medium text-black underline-offset-4 hover:underline"
               >
                 Instagram
               </a>
@@ -282,7 +278,7 @@ export function ShopInfoWindow({
                 href={shop.kakaoPlaceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                className="inline-flex items-center gap-2 font-medium text-black underline-offset-4 hover:underline"
               >
                 <Image
                   src="/kakao-map-icon.png"
@@ -303,7 +299,7 @@ export function ShopInfoWindow({
                 href={waitingProviderLink.providerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white shadow-sm transition-colors hover:border-red-300 hover:bg-red-50"
+                className="ds-icon-button h-9 w-9 rounded-lg"
                 aria-label={`${waitingProviderLink.label} 웨이팅 페이지 열기`}
                 title={`${waitingProviderLink.label} 웨이팅`}
               >
