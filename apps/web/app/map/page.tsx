@@ -825,25 +825,13 @@ export default function MapPage() {
                         ? 'bg-black text-white'
                         : 'bg-[var(--ds-surface-soft)] text-black hover:bg-[var(--ds-surface-soft)]'
                     }`}
+                    aria-pressed={isSelected}
                   >
                     {filter.label}
                   </button>
                 );
               })}
             </div>
-            {hasSelectedFilters && (
-              <div className="mt-3 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setSelectedMenuCategoryIds([])}
-                  className="ds-icon-button h-10 w-10 text-lg font-semibold"
-                  aria-label="선택한 필터 초기화"
-                  title="선택한 필터 초기화"
-                >
-                  ↺
-                </button>
-              </div>
-            )}
           </div>
         )}
 
