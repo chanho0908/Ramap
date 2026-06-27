@@ -32,6 +32,7 @@
 
 - [workflows.md](operations/workflows.md) - 개발 워크플로우
 - [routing-rules.md](operations/routing-rules.md) - Agent 라우팅 규칙
+- [add-shop-to-supabase.md](operations/add-shop-to-supabase.md) - Kakao Map 매장 Supabase 추가 절차
 - [deployment.md](operations/deployment.md) - 배포 가이드
 
 ### 🔸 schema/ - Wiki 운영 규칙
