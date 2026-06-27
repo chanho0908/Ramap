@@ -41,6 +41,7 @@ Thumbs.db
 .idea/
 .claude/settings.local.json
 .openclaw/
+.openclaw/workspace-state.json
 *.swp
 *.swo
 *~
