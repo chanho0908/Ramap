@@ -32,6 +32,7 @@
 | "커밋", "변경사항 저장" | `committer` | Git 커밋 생성 |
 | "PR", "Pull Request" | `pr-creator` | PR 생성 및 push |
 | "커밋하고 PR까지", "commit/push/PR", "/ship" | `committer` → `pr-creator` | 커밋, push, Draft PR 생성 통합 실행 |
+| "/add-shop", "카카오맵 매장 DB 추가" | `implementer` | `wiki/operations/add-shop-to-supabase.md` 기준으로 Supabase 매장 추가 |
 
 **상세 라우팅 규칙**: `wiki/operations/routing-rules.md`
 
@@ -215,12 +216,13 @@ git checkout -b feature/123-add-shop-markers
 
 ### 모델 중립적 작동 원리
 1. **공통 역할 문서**: Canonical Agent 정의는 `.codex/agents/tier1/*.md`, `.codex/agents/tier2/*.md` 파일
-2. **범용 CLI 명령어**: git, gh, pnpm 등 표준 도구
-3. **명시적 프롬프트**: 모델별 API가 아닌 자연어 지침
-4. **도구별 어댑터**: Codex는 `.codex/agents/*.toml`, Claude Code는 `.claude/agents/*.md` 사용
-5. **도구 독립적**: 특정 IDE 기능에 의존하지 않음
+2. **공통 운영 문서**: 반복 작업 절차는 `wiki/operations/*.md`에 canonical 문서로 작성
+3. **범용 CLI 명령어**: git, gh, pnpm 등 표준 도구
+4. **명시적 프롬프트**: 모델별 API가 아닌 자연어 지침
+5. **도구별 어댑터**: Codex는 `.codex/agents/*.toml`·`.codex/skills/*`, Claude Code는 `.claude/agents/*.md`·`.claude/commands/*` 사용
+6. **도구 독립적**: 특정 IDE 기능에 의존하지 않음
 
-### Tool-specific Subagent Adapters
+### Tool-specific Adapters
 
 Ramap Agent 역할은 하나이며, 도구별 파일은 같은 역할 문서를 가리키는 얇은 어댑터입니다.
 
@@ -229,10 +231,17 @@ Ramap Agent 역할은 하나이며, 도구별 파일은 같은 역할 문서를 
 | Codex | `.codex/agents/<agent>.toml` | `.codex/agents/tier1/*.md`, `.codex/agents/tier2/*.md` |
 | Claude Code | `.claude/agents/<agent>.md` | `.codex/agents/tier1/*.md`, `.codex/agents/tier2/*.md` |
 
+반복 작업용 Skill/command도 같은 원칙을 따릅니다.
+
+| 작업 | 도구별 어댑터 | 기준 운영 문서 |
+|------|---------------|----------------|
+| 매장 추가 | `.codex/skills/ramap-add-shop-to-supabase/`, `.claude/commands/add-shop.md` | `wiki/operations/add-shop-to-supabase.md` |
+
 **규칙**:
 - 새 역할을 추가할 때는 먼저 기준 역할 문서를 작성합니다.
 - Codex/Claude 어댑터는 역할 요약, 트리거 설명, 도구 권한, 기준 문서 경로만 포함합니다.
 - 역할 정책을 변경할 때는 기준 역할 문서를 먼저 수정하고 어댑터에는 필요한 최소 변경만 반영합니다.
+- 반복 작업 절차를 추가할 때는 먼저 `wiki/operations/`에 기준 문서를 작성하고, 도구별 Skill/command에는 해당 문서 경로만 연결합니다.
 
 ### Agent 호출 방법 (모델 무관)
 ```
@@ -327,6 +336,7 @@ git checkout -b feature/42-add-shop-markers
 /pr               # PR 생성
 /ship             # 커밋 → push → Draft PR 생성 통합 실행
 /review           # 코드 리뷰
+/add-shop         # Kakao Map 매장을 Supabase DB에 추가
 ```
 
 ---
