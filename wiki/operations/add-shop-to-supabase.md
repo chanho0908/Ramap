@@ -4,9 +4,7 @@ authority: canonical
 
 # Add Shop To Supabase
 
-Kakao Map 매장 URL을 기준으로 Ramap Supabase 데이터베이스의 `public.shops`에 Shop을 추가하거나 기존 Shop 변경사항을 확인하는 공통 운영 절차입니다.
-
-이 문서는 Claude Code, Codex, Cursor, Windsurf 등 특정 AI 도구에 의존하지 않는 기준 문서입니다. 도구별 Skill, command, subagent adapter는 이 문서를 참조하는 얇은 어댑터로만 유지합니다.
+Kakao Map 매장 URL을 기준으로 Ramap Supabase 데이터베이스의 `public.shops`에 Shop을 추가하거나 기존 Shop 변경사항을 확인하는 운영 절차입니다.
 
 ## 트리거
 
@@ -48,22 +46,7 @@ https://place.map.kakao.com/<place_id>
 
 ## 메뉴 카테고리 매핑
 
-Ramap canonical `menu_category_ids`:
-
-| ID | Label | Keywords |
-| --- | --- | --- |
-| `shoyu` | 쇼유 | 쇼유, 간장 |
-| `shio` | 시오 | 시오, 시오라멘, 소금라멘, 쿠로시오 |
-| `miso` | 미소 | 미소, 된장 |
-| `tonkotsu` | 돈코츠 | 돈코츠, 돈코쓰, 돼지뼈 |
-| `tori` | 토리 | 토리, 닭, 치킨, 토리파이탄, 토리빠이탄, 닭백탕 |
-| `tsukemen` | 츠케멘 | 츠케멘, 쯔케멘 |
-| `mazesoba` | 마제소바 | 마제소바, 마제, 비빔 |
-| `aburasoba` | 아부라소바 | 아부라소바, 아부라, 유소바 |
-| `niboshi_gyokai` | 니보시/어패류 | 니보시, 멸치, 어패, 어패류, 교카이, 카츠오, 가다랑어 |
-| `iekei` | 이에케 | 이에케, 이에케이, 요코하마 |
-| `chukasoba` | 츄카소바 | 츄카소바, 중화소바 |
-| `tomato` | 토마토라멘 | 토마토, 토마토라멘 |
+Ramap canonical `menu_category_ids`는 `wiki/reference/menu-classification.md`의 “메뉴 필터 분류안”을 기준으로 매핑합니다.
 
 규칙:
 
