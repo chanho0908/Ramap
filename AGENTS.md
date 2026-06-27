@@ -74,6 +74,7 @@ gh issue create --title "feat: 지도에 라멘집 마커 표시" \
 **규칙**:
 - 모든 작업은 GitHub 이슈로 시작
 - 이슈 제목은 Conventional Commits 형식
+- 이슈 제목과 본문은 한국어로 작성 (type/scope는 Conventional Commits 표기를 위해 영어 허용)
 - 라벨: feature, bug, docs, refactor, test
 
 #### 2. 브랜치 생성
@@ -282,7 +283,7 @@ AI 판단:
 # 사용자: "지도에 라멘집 마커를 표시해줘"
 
 # 1. AI가 이슈 생성
-gh issue create --title "feat(map): add shop markers on map" \
+gh issue create --title "feat(map): 지도에 라멘집 마커 표시" \
   --body "사용자가 지도에서 라멘집 위치를 볼 수 있어야 합니다." \
   --label "feature"
 # 생성된 이슈: #42

@@ -1,0 +1,11 @@
+interface:
+  display_name: "Ramap Add Shop"
+  short_description: "Add Kakao Map shops to Ramap DB"
+  default_prompt: "Use $ramap-add-shop-to-supabase to add this Kakao Map shop to the Ramap Supabase database."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "supabase"
+      description: "Supabase MCP server for Ramap database reads and writes"
+policy:
+  allow_implicit_invocation: true
