@@ -44,20 +44,24 @@ flowchart TD
 ```bash
 # AI가 자동으로 실행
 gh issue create \
-  --title "feat(map): add shop markers on map" \
+  --title "feat(map): 지도에 라멘집 마커 표시" \
   --body "사용자가 지도에서 라멘집 위치를 볼 수 있어야 합니다.\n\n## 요구사항\n- Kakao Map 통합\n- Shop 마커 표시\n- 마커 클릭 시 상세 정보" \
   --label "feature"
 ```
 
 **이슈 제목 형식**:
 ```
-<type>(<scope>): <description>
+<type>(<scope>): <한국어 설명>
 
 예시:
-feat(map): add shop markers on map
-fix(review): resolve image upload error
-docs: update API guide
+feat(map): 지도에 라멘집 마커 표시
+fix(review): 이미지 업로드 오류 수정
+docs: API 가이드 업데이트
 ```
+
+**작성 언어**:
+- 이슈 제목과 본문은 한국어로 작성합니다.
+- Type과 Scope는 Conventional Commits 표기를 위해 영어를 허용합니다.
 
 **라벨**:
 - `feature`: 새 기능
@@ -69,7 +73,7 @@ docs: update API guide
 
 **출력**:
 ```
-Created issue #42: feat(map): add shop markers on map
+Created issue #42: feat(map): 지도에 라멘집 마커 표시
 https://github.com/chanho0908/Ramap/issues/42
 ```
 
