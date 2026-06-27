@@ -40,6 +40,7 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/settings.local.json
+.openclaw/
 *.swp
 *.swo
 *~
@@ -56,3 +57,10 @@ supabase/.branches/
 
 # Generated crawling reports
 reports/
+
+# Local agent notes
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
