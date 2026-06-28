@@ -37,7 +37,7 @@ import type { Location, MapBounds, Shop } from '@ramap/shared';
 const DEFAULT_LOCATION = { lat: 37.5665, lng: 126.978 };
 const GEOLOCATION_PERMISSION_DENIED = 1;
 const LOGIN_GUIDE_MESSAGE =
-  '로그인하면 Shop 북마크와 숨김 기능을 사용할 수 있습니다.';
+  '로그인하면 매장 북마크와 숨김 기능을 사용할 수 있습니다.';
 
 function FilterIcon({ isActive }: { isActive: boolean }) {
   return (
@@ -62,6 +62,7 @@ export default function MapPage() {
     string[]
   >([]);
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
+  const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const [isLocationPermissionDialogOpen, setIsLocationPermissionDialogOpen] =
     useState(false);
   const [hasRequestedCurrentLocation, setHasRequestedCurrentLocation] =
@@ -217,7 +218,7 @@ export default function MapPage() {
         setPersonalizationError(
           error instanceof Error
             ? error.message
-            : 'Shop 개인화 정보를 가져올 수 없습니다.'
+            : '매장 개인화 정보를 가져올 수 없습니다.'
         );
       })
       .finally(() => {
@@ -266,7 +267,7 @@ export default function MapPage() {
         setPersonalizedShopsError(
           error instanceof Error
             ? error.message
-            : 'Shop 목록을 가져올 수 없습니다.'
+            : '매장 목록을 가져올 수 없습니다.'
         );
       })
       .finally(() => {
@@ -376,6 +377,17 @@ export default function MapPage() {
       visibleSearchResults,
     ]
   );
+  const mapVisibleShops = useMemo(
+    () => (personalizationView === 'hidden' ? [] : filteredShops),
+    [filteredShops, personalizationView]
+  );
+  const hiddenShopListShops = useMemo(
+    () =>
+      personalizationView === 'hidden'
+        ? filteredShops.filter((shop) => hiddenShopIdSet.has(shop.id))
+        : [],
+    [filteredShops, hiddenShopIdSet, personalizationView]
+  );
   const searchFocusShopsKey = useMemo(() => {
     if (
       !hasSearchQuery ||
@@ -383,24 +395,24 @@ export default function MapPage() {
       isGlobalSearchStale ||
       globalSearchError ||
       focusedAdministrativeRegion ||
-      filteredShops.length <= 1
+      mapVisibleShops.length <= 1
     ) {
       return null;
     }
 
     const filterKey = [...selectedMenuCategoryIds].sort().join(':');
-    const shopKey = filteredShops
+    const shopKey = mapVisibleShops
       .map((shop) => `${shop.id}:${shop.location.lat}:${shop.location.lng}`)
       .join('|');
 
     return `${normalizedSearchQuery}:${filterKey}:${shopKey}`;
   }, [
-    filteredShops,
     focusedAdministrativeRegion,
     globalSearchError,
     hasSearchQuery,
     isGlobalSearchStale,
     isLoadingGlobalSearch,
+    mapVisibleShops,
     normalizedSearchQuery,
     selectedMenuCategoryIds,
   ]);
@@ -411,19 +423,19 @@ export default function MapPage() {
       isGlobalSearchStale ||
       globalSearchError ||
       focusedAdministrativeRegion ||
-      filteredShops.length !== 1
+      mapVisibleShops.length !== 1
     ) {
       return null;
     }
 
-    return filteredShops[0];
+    return mapVisibleShops[0];
   }, [
-    filteredShops,
     focusedAdministrativeRegion,
     globalSearchError,
     hasSearchQuery,
     isGlobalSearchStale,
     isLoadingGlobalSearch,
+    mapVisibleShops,
   ]);
   const singleSearchFocusShopKey = useMemo(() => {
     if (!singleSearchFocusShop) {
@@ -444,25 +456,30 @@ export default function MapPage() {
   const hasSelectedFilters = selectedMenuCategoryIds.length > 0;
   const hasActiveRefinement = hasSearchQuery || hasSelectedFilters;
   const hasActivePersonalizationView = personalizationView !== 'all';
+  const isHiddenPersonalizationView = personalizationView === 'hidden';
   const usesGlobalSearchResults =
     personalizationView === 'all' &&
     hasSearchQuery &&
     !focusedAdministrativeRegion;
-  const isLoadingVisibleShops = isWaitingForAllViewPersonalization
-    ? true
+  const isLoadingVisibleShops = isHiddenPersonalizationView
+    ? false
+    : isWaitingForAllViewPersonalization
+      ? true
+      : usesGlobalSearchResults
+        ? isLoadingGlobalSearch
+        : hasActivePersonalizationView
+          ? isPersonalizationLoading || isLoadingPersonalizedShops
+          : isLoadingShops ||
+            (focusedAdministrativeRegion && areBoundsShopsStale);
+  const visibleShopsError = isHiddenPersonalizationView
+    ? null
     : usesGlobalSearchResults
-      ? isLoadingGlobalSearch
+      ? globalSearchError
       : hasActivePersonalizationView
-        ? isPersonalizationLoading || isLoadingPersonalizedShops
-        : isLoadingShops ||
-          (focusedAdministrativeRegion && areBoundsShopsStale);
-  const visibleShopsError = usesGlobalSearchResults
-    ? globalSearchError
-    : hasActivePersonalizationView
-      ? (personalizationError ?? personalizedShopsError)
-      : focusedAdministrativeRegion && areBoundsShopsStale
-        ? null
-        : shopsError;
+        ? (personalizationError ?? personalizedShopsError)
+        : focusedAdministrativeRegion && areBoundsShopsStale
+          ? null
+          : shopsError;
 
   useEffect(() => {
     if (!hasSearchQuery) {
@@ -479,12 +496,12 @@ export default function MapPage() {
       return;
     }
 
-    if (filteredShops.length !== 1) {
+    if (mapVisibleShops.length !== 1) {
       lastAutoCenteredShopKeyRef.current = null;
       return;
     }
 
-    const [shop] = filteredShops;
+    const [shop] = mapVisibleShops;
     const filterKey = [...selectedMenuCategoryIds].sort().join(':');
     const shopKey = [
       normalizedSearchQuery,
@@ -501,12 +518,12 @@ export default function MapPage() {
     lastAutoCenteredShopKeyRef.current = shopKey;
     setMapCenter(shop.location);
   }, [
-    filteredShops,
     focusedAdministrativeRegion,
     globalSearchError,
     hasSearchQuery,
     isGlobalSearchStale,
     isLoadingGlobalSearch,
+    mapVisibleShops,
     normalizedSearchQuery,
     selectedMenuCategoryIds,
   ]);
@@ -534,6 +551,20 @@ export default function MapPage() {
         ? current.filter((id) => id !== categoryId)
         : [...current, categoryId]
     );
+  }, []);
+
+  const handleMoreFiltersOpenChange = useCallback((isOpen: boolean) => {
+    setIsMoreFiltersOpen(isOpen);
+    if (isOpen) {
+      setIsAuthMenuOpen(false);
+    }
+  }, []);
+
+  const handleAuthMenuOpenChange = useCallback((isOpen: boolean) => {
+    setIsAuthMenuOpen(isOpen);
+    if (isOpen) {
+      setIsMoreFiltersOpen(false);
+    }
   }, []);
 
   const handleMoveToCurrentLocation = useCallback(() => {
@@ -607,7 +638,7 @@ export default function MapPage() {
         setPersonalizationError(
           error instanceof Error
             ? error.message
-            : 'Shop 북마크 상태를 변경할 수 없습니다.'
+            : '매장 북마크 상태를 변경할 수 없습니다.'
         );
       } finally {
         setIsPersonalizationSubmitting(false);
@@ -642,7 +673,7 @@ export default function MapPage() {
         setPersonalizationError(
           error instanceof Error
             ? error.message
-            : 'Shop 숨김 상태를 변경할 수 없습니다.'
+            : '매장 숨김 상태를 변경할 수 없습니다.'
         );
       } finally {
         setIsPersonalizationSubmitting(false);
@@ -657,25 +688,35 @@ export default function MapPage() {
     }
 
     const shop = shopPendingHide;
+    const shouldRemoveBookmark = bookmarkedShopIdSet.has(shop.id);
     setIsPersonalizationSubmitting(true);
     setPersonalizationError(null);
 
     try {
       await hideShop(shop.id);
+      if (shouldRemoveBookmark) {
+        await removeShopBookmark(shop.id);
+      }
+
       setHiddenShopIds((current) =>
         current.includes(shop.id) ? current : [...current, shop.id]
       );
+      if (shouldRemoveBookmark) {
+        setBookmarkedShopIds((current) =>
+          current.filter((shopId) => shopId !== shop.id)
+        );
+      }
       setShopPendingHide(null);
     } catch (error) {
       setPersonalizationError(
         error instanceof Error
           ? error.message
-          : 'Shop 숨김 상태를 변경할 수 없습니다.'
+          : '매장 숨김 상태를 변경할 수 없습니다.'
       );
     } finally {
       setIsPersonalizationSubmitting(false);
     }
-  }, [shopPendingHide]);
+  }, [bookmarkedShopIdSet, shopPendingHide]);
 
   const handleShowBookmarkedShops = useCallback(() => {
     if (!user) {
@@ -698,6 +739,10 @@ export default function MapPage() {
       current === 'hidden' ? 'all' : 'hidden'
     );
   }, [showLoginGuide, user]);
+
+  const handleMoveToHiddenShopLocation = useCallback((shop: Shop) => {
+    setMapCenter(shop.location);
+  }, []);
 
   const handleDeleteAccount = useCallback(async () => {
     setIsDeletingAccount(true);
@@ -758,7 +803,7 @@ export default function MapPage() {
       <main className="flex-1 relative">
         <MapView
           center={mapCenter}
-          shops={filteredShops}
+          shops={mapVisibleShops}
           bookmarkedShopIds={bookmarkedShopIdSet}
           hiddenShopIds={hiddenShopIdSet}
           isPersonalizationSubmitting={isPersonalizationSubmitting}
@@ -766,7 +811,7 @@ export default function MapPage() {
           focusBoundsKey={administrativeRegionFocusKey}
           focusShops={
             !focusedAdministrativeRegion && searchFocusShopsKey
-              ? filteredShops
+              ? mapVisibleShops
               : undefined
           }
           focusShopsKey={searchFocusShopsKey}
@@ -793,7 +838,7 @@ export default function MapPage() {
                 onChange={(event) => setSearchQuery(event.target.value)}
                 type="search"
                 placeholder="가게명, 주소, 전화번호"
-                className="h-14 w-full rounded-[24px] border-0 bg-white pl-12 pr-16 text-base font-[480] text-black outline-none placeholder:font-[330] placeholder:text-gray-500 focus:ring-2 focus:ring-black/20"
+                className="h-14 w-full rounded-[24px] border-0 bg-white pl-12 pr-16 text-base font-[480] text-black outline-none placeholder:font-[480] placeholder:text-gray-500 focus:ring-2 focus:ring-black/20"
               />
               {searchQuery && (
                 <button
@@ -837,7 +882,7 @@ export default function MapPage() {
 
         <button
           type="button"
-          onClick={() => setIsMoreFiltersOpen((current) => !current)}
+          onClick={() => handleMoreFiltersOpenChange(!isMoreFiltersOpen)}
           className={`ds-icon-button absolute bottom-20 right-4 z-30 h-14 w-14 shadow-[var(--ds-shadow-soft)] ring-2 ring-white ${
             isMoreFiltersOpen ? 'ds-icon-button-active' : ''
           }`}
@@ -861,9 +906,9 @@ export default function MapPage() {
               ? 'ds-icon-button-active'
               : ''
           }`}
-          aria-label="북마크한 Shop만 보기"
+          aria-label="북마크한 매장만 보기"
           aria-pressed={personalizationView === 'bookmarked'}
-          title="북마크한 Shop만 보기"
+          title="북마크한 매장만 보기"
         >
           {personalizationView === 'bookmarked' ? '★' : '☆'}
         </button>
@@ -903,11 +948,88 @@ export default function MapPage() {
           isLoading={isAuthLoading}
           isSubmitting={isAuthSubmitting}
           activeView={personalizationView}
+          isMenuOpen={isAuthMenuOpen}
           onLogin={handleLogin}
           onLogout={handleLogout}
+          onMenuOpenChange={handleAuthMenuOpenChange}
           onShowHiddenShops={handleShowHiddenShops}
           onRequestAccountDeletion={() => setIsAccountDeletionDialogOpen(true)}
         />
+
+        {isHiddenPersonalizationView && (
+          <section
+            className="ds-panel absolute bottom-0 left-0 right-0 z-20 max-h-[42vh] w-full overflow-hidden rounded-b-none rounded-t-[24px] p-4 sm:bottom-4 sm:left-1/2 sm:right-auto sm:w-[calc(100%-2rem)] sm:max-w-[24rem] sm:-translate-x-1/2 sm:rounded-[24px]"
+            aria-label="숨긴 매장 관리"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-gray-950">
+                  숨긴 매장
+                </h2>
+                <p className="text-xs text-gray-500">
+                  지도 마커에는 표시되지 않습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPersonalizationView('all')}
+                className="rounded-full px-3 py-1.5 text-sm font-medium text-black hover:bg-[var(--ds-surface-soft)]"
+              >
+                닫기
+              </button>
+            </div>
+
+            {personalizedShopsError || personalizationError ? (
+              <p className="rounded-xl border border-[var(--ds-hairline)] bg-[var(--ds-surface-soft)] px-3 py-2 text-sm text-black">
+                {personalizationError ?? personalizedShopsError}
+              </p>
+            ) : isLoadingPersonalizedShops || isPersonalizationLoading ? (
+              <div className="flex items-center gap-2 py-3 text-sm font-medium text-black">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-b-black" />
+                숨긴 매장 불러오는 중...
+              </div>
+            ) : hiddenShopListShops.length === 0 ? (
+              <p className="rounded-xl border border-[var(--ds-hairline)] bg-[var(--ds-surface-soft)] px-3 py-2 text-sm text-gray-600">
+                숨긴 매장이 없습니다.
+              </p>
+            ) : (
+              <ul className="max-h-[30vh] space-y-2 overflow-y-auto pr-1">
+                {hiddenShopListShops.map((shop) => (
+                  <li
+                    key={shop.id}
+                    className="rounded-2xl border border-[var(--ds-hairline)] bg-white p-3"
+                  >
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-950">
+                        {shop.name}
+                      </h3>
+                      <p className="mt-1 text-xs leading-5 text-gray-600">
+                        {shop.address}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleMoveToHiddenShopLocation(shop)}
+                        className="rounded-full bg-[var(--ds-surface-soft)] px-3 py-1.5 text-xs font-semibold text-black ring-1 ring-transparent hover:bg-gray-200 hover:ring-gray-300"
+                      >
+                        위치로 이동
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleHidden(shop)}
+                        className="rounded-full bg-black px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+                        disabled={isPersonalizationSubmitting}
+                      >
+                        숨김 해제
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
 
         {loginGuideMessage && (
           <div
@@ -965,6 +1087,11 @@ export default function MapPage() {
                 숨긴 매장은 지도에서 제외되며, 설정의 숨긴 매장 보기에서
                 다시 확인할 수 있습니다.
               </p>
+              {bookmarkedShopIdSet.has(shopPendingHide.id) && (
+                <p className="mt-2 text-sm leading-6 text-gray-600">
+                  북마크한 매장입니다. 숨기면 북마크도 함께 해제됩니다.
+                </p>
+              )}
               <div className="mt-5 flex justify-end gap-2">
                 <button
                   type="button"
@@ -1099,12 +1226,13 @@ export default function MapPage() {
         {/* 가게 없음 메시지 */}
         {!isLoadingVisibleShops &&
           !visibleShopsError &&
-          filteredShops.length === 0 && (
+          !isHiddenPersonalizationView &&
+          mapVisibleShops.length === 0 && (
             <div className="ds-panel absolute left-1/2 top-1/2 max-w-sm -translate-x-1/2 -translate-y-1/2 p-6 text-center">
               <div className="text-4xl mb-3">🍜</div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 {hasActivePersonalizationView
-                  ? `${personalizationView === 'bookmarked' ? '북마크한' : '숨긴'} Shop이 없습니다`
+                  ? `${personalizationView === 'bookmarked' ? '북마크한' : '숨긴'} 매장이 없습니다`
                   : hasActiveRefinement
                     ? '조건에 맞는 가게가 없습니다'
                     : '주변에 가게가 없습니다'}
