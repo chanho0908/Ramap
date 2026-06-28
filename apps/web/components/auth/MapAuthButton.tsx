@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 
@@ -11,8 +11,10 @@ interface MapAuthButtonProps {
   isLoading: boolean;
   isSubmitting: boolean;
   activeView: PersonalizationView;
+  isMenuOpen: boolean;
   onLogin: () => Promise<void>;
   onLogout: () => Promise<void>;
+  onMenuOpenChange: (isOpen: boolean) => void;
   onShowHiddenShops: () => void;
   onRequestAccountDeletion: () => void;
 }
@@ -87,19 +89,20 @@ export function MapAuthButton({
   isLoading,
   isSubmitting,
   activeView,
+  isMenuOpen,
   onLogin,
   onLogout,
+  onMenuOpenChange,
   onShowHiddenShops,
   onRequestAccountDeletion,
 }: MapAuthButtonProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isDisabled = isLoading || isSubmitting;
   const label = user ? '설정' : '카카오 로그인';
   const menuTitle = useMemo(() => user?.email ?? '로그인한 사용자', [user]);
 
   const runMenuAction = (action: () => void) => {
     action();
-    setIsMenuOpen(false);
+    onMenuOpenChange(false);
   };
 
   const handleMainClick = async () => {
@@ -112,11 +115,11 @@ export function MapAuthButton({
       return;
     }
 
-    setIsMenuOpen((current) => !current);
+    onMenuOpenChange(!isMenuOpen);
   };
 
   const handleLogout = async () => {
-    setIsMenuOpen(false);
+    onMenuOpenChange(false);
     await onLogout();
   };
 
@@ -150,7 +153,9 @@ export function MapAuthButton({
         disabled={isDisabled}
         className={`ds-icon-button h-14 w-14 text-sm font-bold shadow-[var(--ds-shadow-soft)] ring-2 ring-white disabled:cursor-not-allowed disabled:opacity-70 ${
           user
-            ? 'ds-icon-button-active'
+            ? isMenuOpen
+              ? 'ds-icon-button-active'
+              : ''
             : 'bg-[#FEE500] text-[#191919] hover:bg-[#FEE500]'
         }`}
         aria-label={label}

@@ -115,6 +115,11 @@ body {
     background: var(--ds-inverse-canvas);
     color: var(--ds-inverse-ink);
   }
+
+  .ds-menu-item-active:hover {
+    background: var(--ds-inverse-canvas);
+    color: var(--ds-inverse-ink);
+  }
 }
 
 @layer utilities {
